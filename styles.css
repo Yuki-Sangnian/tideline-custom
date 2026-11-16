@@ -4036,3 +4036,5 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .idea-tag-current button:is(:hover,:focus-visible){background:color-mix(in srgb,var(--ink) 8%,transparent);outline:none}
 .compass-root .idea-tag-options button[aria-pressed="true"]{border-color:var(--tick);color:var(--ink)}
 .compass-root .idea-card-tags button{cursor:pointer}
+/* 复盘页航海日志：让文字区高度被框住（超出由脚本缩小字号），不再把文字顶出框外 */
+.compass-root #review .q-quote blockquote{min-height:0;overflow:hidden}

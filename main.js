@@ -19663,9 +19663,15 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
     else if (D2?.start === "thought") this.page = "thought";
     this.registerDomEvent(this.root, "scroll", () => this.more.paint(), { capture: true, passive: true });
     document.fonts?.ready.then(() => {
-      if (this.root.isConnected) this.more.update();
+      if (this.root.isConnected) {
+        this.more.update();
+        this.fitQuarterQuote();
+      }
     });
-    if (document.fonts) this.registerDomEvent(document.fonts, "loadingdone", () => this.more.update());
+    if (document.fonts) this.registerDomEvent(document.fonts, "loadingdone", () => {
+      this.more.update();
+      this.fitQuarterQuote();
+    });
     this.applyDevice(false);
     this.registerEvent(this.app.workspace.on("css-change", () => this.theme()));
     this.registerDomEvent(this.root, "click", (e) => this.click(e));
@@ -19973,7 +19979,23 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
   }
   // 手绘框：按钮（.outline）与面板（.hand-panel / .hand-pill），尺寸没变就不重画
   // 先把所有要画的框量完，再一起写：边量边写会让每个元素都触发一次重新排版（几十上百个框时要几十毫秒）
+  // 复盘页的「航海日志」：文字多就把字号缩小，保证全部文字都在框里（最小 10px，再多才在框里滚动）
+  fitQuarterQuote() {
+    const bq = this.root?.querySelector("#review .q-quote blockquote");
+    if (!bq || !bq.offsetParent) return;
+    bq.style.fontSize = "";
+    bq.style.overflowY = "";
+    bq.style.display = "block";
+    let size = parseFloat(getComputedStyle(bq).fontSize) || 15, guard = 0;
+    while (bq.scrollHeight > bq.clientHeight + 1 && size > 10 && guard++ < 40) {
+      size -= 0.5;
+      bq.style.fontSize = size + "px";
+    }
+    if (bq.scrollHeight > bq.clientHeight + 1) bq.style.overflowY = "auto";
+    bq.style.display = "";
+  }
   frames() {
+    this.fitQuarterQuote();
     if(!this.liveFrameObserver){
       this.liveFrameSeen=new WeakSet();
       this.liveFrameObserver=new ResizeObserver(()=>{
