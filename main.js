@@ -10081,7 +10081,7 @@ function reviewPage(a2) {
     for (const v2 of Array.from({length:5},(_,i)=>Math.round(max*i/4))) s += ink2([[x0 - 3, Y(v2)], [x1, Y(v2)]], 0.4, a2.TICK) + `<text x="${x0 - 7}" y="${Y(v2) + 3}" text-anchor="end" class="ax">${v2}</text>`;
     s += ink2(Q2.tasks.map((v2, i) => [X2(i), Y(v2)]), 1.35) + Q2.tasks.map((v2, i) => `<circle cx="${X2(i)}" cy="${Y(v2)}" r="1.9" fill="${a2.INK}"/>`).join("") + a2.dash(Q2.hours.map((v2, i) => [X2(i), Y(v2)]), 1.1, a2.SECONDARY) + Q2.hours.map((v2, i) => circle2(X2(i), Y(v2), 1.8, 0.9, a2.SECONDARY)).join("");
     Q2.tasks.forEach((_2, i) => {
-      if (i % 2 === 0 || i === 11) s += `<text x="${X2(i)}" y="${base2 + 15}" text-anchor="middle" class="ax">${Q2.weeks?.[i] || i+1}</text>`;
+      if (i % 2 === 0) s += `<text x="${X2(i)}" y="${base2 + 15}" text-anchor="middle" class="ax">${Q2.weeks?.[i] || i+1}</text>`;
     });
     return `<svg class="q-chart" viewBox="0 0 ${W2} ${H2}" aria-label="\u6574\u4F53\u8D8B\u52BF\uFF1A\u4EFB\u52A1\u5B8C\u6210\u6570\u4E0E\u6DF1\u5EA6\u6295\u5165">${s}</svg>`;
   }
@@ -10634,7 +10634,7 @@ function libraryPage(a2) {
   }
   function toolbar() {
     const f = d.ui.libraryFilter;
-    return `<div class="lib-toolbar"><label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6587\u732E\u3001\u7B14\u8BB0\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>${f ? B3("library-clear-filter", "", `<span>\u9879\u76EE\uFF1A${esc2(a2.project(f).title)}</span><i aria-hidden="true">\xD7</i>`, "\u6E05\u9664\u9879\u76EE\u7B5B\u9009", 'class="library-filter lib-chip hand-pill is-on"') : ""}${B3("library-view", "shelf", G3("bookmark") + "<span>\u77E5\u8BC6\u5E93</span>", "\u6253\u5F00\u6211\u7684\u77E5\u8BC6\u5E93", 'class="lib-view-toggle hand-pill"')}</div>`;
+    return `<div class="lib-toolbar"><label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6587\u732E\u3001\u7B14\u8BB0\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>${f ? B3("library-clear-filter", "", icon2("route") + `<span>${esc2(a2.project(f).title)}</span><i aria-hidden="true">\xD7</i>`, "\u6E05\u9664\u9879\u76EE\u7B5B\u9009\uFF1A" + a2.project(f).title, 'class="lib-project-chip hand-pill is-on"') : ""}${B3("library-view", "shelf", G3("bookmark") + "<span>\u77E5\u8BC6\u5E93</span>", "\u6253\u5F00\u6211\u7684\u77E5\u8BC6\u5E93", 'class="lib-view-toggle hand-pill"')}</div>`;
   }
   const parseLibraryKeywords = value => [...new Set(String(value || "").split(/[,，、;；\r\n]+/).map(v=>v.trim()).filter(Boolean))];
   const keywordPreview = value => {

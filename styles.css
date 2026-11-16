@@ -4038,3 +4038,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .idea-card-tags button{cursor:pointer}
 /* 复盘页航海日志：让文字区高度被框住（超出由脚本缩小字号），不再把文字顶出框外 */
 .compass-root #review .q-quote blockquote{min-height:0;overflow:hidden}
+/* 知识库顶部的「项目筛选」标签：和旁边的 Zotero、知识库按钮一样的手绘框，用项目图标代替「项目」二字 */
+.compass-root #library .lib-project-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border:0;border-radius:17px;font-size:13px;color:var(--ink);background:var(--paper);white-space:nowrap;flex:none;position:relative}
+.compass-root #library .lib-project-chip svg:not(.hand-popup-frame){width:16px!important;height:16px!important;flex:none}
+.compass-root #library .lib-project-chip i{font-style:normal;color:var(--secondary)}
+.compass-root #library .lib-project-chip:is(:hover,:focus-visible) i{color:var(--ink)}
