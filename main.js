@@ -10081,7 +10081,7 @@ function reviewPage(a2) {
     for (const v2 of Array.from({length:5},(_,i)=>Math.round(max*i/4))) s += ink2([[x0 - 3, Y(v2)], [x1, Y(v2)]], 0.4, a2.TICK) + `<text x="${x0 - 7}" y="${Y(v2) + 3}" text-anchor="end" class="ax">${v2}</text>`;
     s += ink2(Q2.tasks.map((v2, i) => [X2(i), Y(v2)]), 1.35) + Q2.tasks.map((v2, i) => `<circle cx="${X2(i)}" cy="${Y(v2)}" r="1.9" fill="${a2.INK}"/>`).join("") + a2.dash(Q2.hours.map((v2, i) => [X2(i), Y(v2)]), 1.1, a2.SECONDARY) + Q2.hours.map((v2, i) => circle2(X2(i), Y(v2), 1.8, 0.9, a2.SECONDARY)).join("");
     Q2.tasks.forEach((_2, i) => {
-      if (i % 2 === 0) s += `<text x="${X2(i)}" y="${base2 + 15}" text-anchor="middle" class="ax">${Q2.weeks?.[i] || i+1}</text>`;
+      if (i % 2 === 0 || i === 11) s += `<text x="${X2(i)}" y="${base2 + 15}" text-anchor="middle" class="ax">${Q2.weeks?.[i] || i+1}</text>`;
     });
     return `<svg class="q-chart" viewBox="0 0 ${W2} ${H2}" aria-label="\u6574\u4F53\u8D8B\u52BF\uFF1A\u4EFB\u52A1\u5B8C\u6210\u6570\u4E0E\u6DF1\u5EA6\u6295\u5165">${s}</svg>`;
   }
