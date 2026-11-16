@@ -10037,7 +10037,8 @@ function reviewPage(a2) {
     hours: [24, 28, 31, 39, 40, 44, 49, 54, 58, 63, 70, 86.5],
     time: [["\u7814\u7A76\u4E0E\u5B66\u4E60", 34], ["\u5B9E\u9A8C\u4E0E\u9879\u76EE", 24], ["\u751F\u6D3B\u4E8B\u52A1", 16], ["\u8FD0\u52A8\u5065\u5EB7", 11], ["\u9605\u8BFB\u4E0E\u601D\u8003", 9], ["\u5176\u4ED6", 6]]
   };
-  const Q2 = d.review.quarter;
+  // 季度数据每次数据更新都会换成新的对象，所以这里不能只记住第一次的那一份，否则保存试航计划等改动之后页面还是旧的
+  const Q2 = new Proxy({}, { get: (_2, key) => d.review.quarter[key], set: (_2, key, value) => (d.review.quarter[key] = value, true), has: (_2, key) => key in d.review.quarter });
   const QG = {
     water: `<path d="M9 2C7 6 3 9 3 12a6 6 0 0 0 12 0c0-3-4-6-6-10Z" fill="none" stroke="currentColor" stroke-width="1.2"/>`,
     task: ink2([[4, 3], [14, 3], [14, 16], [4, 16], [4, 3]], 1.1) + ink2([[7, 2], [11, 2], [11, 4.4], [7, 4.4], [7, 2]], 0.9) + ink2([[6.4, 9.6], [8.4, 11.6], [12, 7.4]], 1.1),
