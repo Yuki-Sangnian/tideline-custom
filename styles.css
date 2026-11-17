@@ -4058,3 +4058,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .lib-reading :is(h1,h2,h3,h4){margin:.8em 0 .4em;font-size:1em;font-weight:600}
 .compass-root .lib-reading a{color:var(--now);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .compass-root .lib-marks li > .lib-reading{font-size:13px}
+/* 知识库笔记输入框下面的格式按钮 */
+.compass-root .lib-note-bar .lib-fmt{display:inline-flex;align-items:center;justify-content:center;width:28px;height:26px;padding:0;margin:0;border:0;border-radius:5px;background:none;box-shadow:none;font-size:13px;color:var(--secondary);cursor:pointer}
+.compass-root .lib-note-bar .lib-fmt:is(:hover,:focus-visible){color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);outline:none}
+.compass-root .lib-note-bar .lib-fmt[data-lib-fmt="b"]{font-weight:700}
+.compass-root .lib-note-bar .lib-fmt[data-lib-fmt="i"]{font-style:italic}

@@ -10781,7 +10781,7 @@ title: ${item.title}
 stage:: ${item.stage}
 
 ${item.conclusion}`)}</pre>` : ""}</div>
- <form class="lib-note" data-p2-form="library-note" data-library-section="${sub}"><h4>${entryLabel}</h4><textarea name="note" rows="3" placeholder="${esc2({abstract:"添加关键信息，可写成：观点：内容",note:"写下新增笔记…",marks:"写下摘录或标注…",related:"添加相关内容，支持 [[笔记名]] 链接…"}[sub])}" aria-label="\u6211\u7684\u7B14\u8BB0"></textarea><div class="lib-note-bar"><span>${["B", "I", "\u2261", "\u2197"].map((x2) => `<i>${x2}</i>`).join("")}</span><small class="lib-note-key-hint">回车保存 · Shift＋回车换行</small></div></form></section>`;
+ <form class="lib-note" data-p2-form="library-note" data-library-section="${sub}"><h4>${entryLabel}</h4><textarea name="note" rows="3" placeholder="${esc2({abstract:"添加关键信息，可写成：观点：内容",note:"写下新增笔记…",marks:"写下摘录或标注…",related:"添加相关内容，支持 [[笔记名]] 链接…"}[sub])}" aria-label="\u6211\u7684\u7B14\u8BB0"></textarea><div class="lib-note-bar"><span>${[["B", "b", "加粗"], ["I", "i", "斜体"], ["\u2261", "list", "项目列表"], ["\u2197", "link", "插入 [[笔记链接]]"]].map(([x2, k2, l2]) => `<button type="button" class="lib-fmt" data-lib-fmt="${k2}" aria-label="${l2}" title="${l2}">${x2}</button>`).join("")}</span><small class="lib-note-key-hint">回车保存 · Shift＋回车换行</small></div></form></section>`;
   }
   function related(kind, item) {
     const out = [];
@@ -10817,6 +10817,23 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     searchResults();
     paintReading(root);
   }
+  // 笔记输入框下面的 B / I / 列表 / 链接：给选中的文字加格式（没选中就在光标处插入），光标和选区不会丢
+  HOST.addEventListener("mousedown",e=>{if(e.target.closest?.("[data-lib-fmt]"))e.preventDefault();});
+  HOST.addEventListener("click",e=>{
+    const btn=e.target.closest?.("[data-lib-fmt]");if(!btn)return;
+    const ta=btn.closest("form")?.querySelector("textarea");if(!ta)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const kind=btn.dataset.libFmt,v=ta.value,s0=ta.selectionStart,e0=ta.selectionEnd,sel=v.slice(s0,e0);
+    if(kind==="list"){
+      const ls=v.lastIndexOf("\n",s0-1)+1,le=v.indexOf("\n",e0)===-1?v.length:v.indexOf("\n",e0),block=v.slice(ls,le).split("\n").map(l=>/^\s*[-*]\s/.test(l)?l:"- "+l).join("\n");
+      ta.value=v.slice(0,ls)+block+v.slice(le);ta.setSelectionRange(ls,ls+block.length);
+    }else{
+      const [a,b]={b:["**","**"],i:["*","*"],link:["[[","]]"]}[kind]||["",""];
+      ta.value=v.slice(0,s0)+a+sel+b+v.slice(e0);
+      sel?ta.setSelectionRange(s0+a.length,s0+a.length+sel.length):ta.setSelectionRange(s0+a.length,s0+a.length);
+    }
+    ta.focus();ta.dispatchEvent(new Event("input",{bubbles:true}));
+  },true);
   HOST.addEventListener("keydown",e=>{
     if(!e.target.matches?.("[data-library-query]")||e.isComposing||e.keyCode===229)return;
     if(e.key==="Enter") {e.preventDefault();e.stopImmediatePropagation();$5('.lib-search-result')?.click();}
