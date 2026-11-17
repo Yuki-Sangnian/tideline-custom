@@ -10961,7 +10961,8 @@ function libraryPage(a2) {
   const matches = (kind,item) => {
     if(!item)return false;
     const text=searchText(kind,item).normalize("NFKC").toLocaleLowerCase();
-    return q2().normalize("NFKC").toLocaleLowerCase().split(/\s+/).filter(Boolean).every(term=>text.includes(term));
+    // 搜 #标签 和直接搜标签 / 类别都行
+    return q2().normalize("NFKC").toLocaleLowerCase().split(/\s+/).map(term=>term.replace(/^#+/,"")).filter(Boolean).every(term=>text.includes(term));
   };
   function searchResults() {
     const root=$5("#library"), input=root?.querySelector("[data-library-query]");
@@ -10977,7 +10978,7 @@ function libraryPage(a2) {
     panel.innerHTML=`<header><span role="status">找到 ${results.length} 条结果</span>${B3("library-search-clear","","清空","清空搜索")}</header><div class="lib-search-result-list">${results.map(([kind,item])=>{
       const summary=String(item.conclusion||meta(kind,item).abstract||"").trim();
       return B3("library-search-open",kind+"|"+item.id,`<strong>${esc2(item.title)}</strong><small>${kind==="book"?"书籍":"文献"} · ${esc2(meta(kind,item).authors||"未填写作者")}</small>${summary?`<p class="lib-search-summary">${esc2(summary.length>110?summary.slice(0,110)+"…":summary)}</p>`:""}`,"打开 "+item.title,'class="lib-search-result"');
-    }).join("")||'<p class="lib-search-empty">没有匹配的书籍或文献。可搜索标题、作者、关键词、摘要或笔记内容。</p>'}</div>`;
+    }).join("")||'<p class="lib-search-empty">没有匹配的书籍或文献。可搜索标题、作者、类别（比如「播客」）、标签 / 关键词（比如「女性主义」，也可以写成 #女性主义）、摘要或笔记内容。</p>'}</div>`;
     root.appendChild(panel);
   }
   function noteLinks(kind, item) {
@@ -11244,7 +11245,7 @@ function libraryPage(a2) {
   }
   function toolbar() {
     const f = d.ui.libraryFilter;
-    return `<div class="lib-toolbar"><label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6587\u732E\u3001\u7B14\u8BB0\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>${f ? B3("library-clear-filter", "", icon2("route") + `<span>${esc2(a2.project(f).title)}</span><i aria-hidden="true">\xD7</i>`, "\u6E05\u9664\u9879\u76EE\u7B5B\u9009\uFF1A" + a2.project(f).title, 'class="lib-project-chip hand-pill is-on"') : ""}${B3("library-view", "shelf", G3("bookmark") + "<span>\u77E5\u8BC6\u5E93</span>", "\u6253\u5F00\u6211\u7684\u77E5\u8BC6\u5E93", 'class="lib-view-toggle hand-pill"')}</div>`;
+    return `<div class="lib-toolbar"><label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6587\u732E\u3001\u7B14\u8BB0\u3001\u7C7B\u522B\u3001\u6807\u7B7E\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>${f ? B3("library-clear-filter", "", icon2("route") + `<span>${esc2(a2.project(f).title)}</span><i aria-hidden="true">\xD7</i>`, "\u6E05\u9664\u9879\u76EE\u7B5B\u9009\uFF1A" + a2.project(f).title, 'class="lib-project-chip hand-pill is-on"') : ""}${B3("library-view", "shelf", G3("bookmark") + "<span>\u77E5\u8BC6\u5E93</span>", "\u6253\u5F00\u6211\u7684\u77E5\u8BC6\u5E93", 'class="lib-view-toggle hand-pill"')}</div>`;
   }
   const parseLibraryKeywords = value => [...new Set(String(value || "").split(/[,，、;；\r\n]+/).map(v=>v.trim()).filter(Boolean))];
   const keywordPreview = value => {
@@ -11312,16 +11313,16 @@ ${item.conclusion}`)}</pre>` : ""}
   }
   // 书架页左边列表里书籍的顺序：读完按读完日期，越近的越靠上；在读按进度，进度大的靠上；想读保持原来的顺序
   const shelfOrder = (kind, stage2, list2) => {
-    if (kind !== "book") return list2;
-    if (stage2 === "done") return list2.slice().sort((a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || "")));
-    if (stage2 === "reading") return list2.slice().sort((a3, b3) => pct(kind, b3) - pct(kind, a3));
-    return list2;
+    const byDate = (a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || "")), byProgress = (a3, b3) => pct(kind, b3) - pct(kind, a3);
+    if (kind === "book") return stage2 === "done" ? list2.slice().sort(byDate) : stage2 === "reading" ? list2.slice().sort(byProgress) : list2;
+    // 文献：已读的（已泛读、已精读）按读完日期，待读的（待泛读、待精读）按进度，规则和书籍一样
+    return ["skimmed", "deep-done"].includes(stage2) ? list2.slice().sort(byDate) : ["inbox", "to-deep"].includes(stage2) ? list2.slice().sort(byProgress) : list2;
   };
   function listPane() {
     const tab = d.ui.libraryTab || "literature", groups = tab === "fav" ? [["\u6536\u85CF", [...d.literature.map((x2) => ["literature", x2]), ...d.books.map((x2) => ["book", x2])].filter(([k2, x2]) => meta(k2, x2).fav)]] : [...stages[tab].map(([s, l2]) => [l2, shelfOrder(tab, s, records(tab).filter((x2) => x2.stage === s)).map((x2) => [tab, x2])]), ...tab === "literature" ? [["\u653E\u5F03", d.literature.filter((x2) => x2.stage === "dropped").map((x2) => ["literature", x2])]] : []];
     const shut = d.ui.libraryShut ??= { "\u653E\u5F03": true, ...a2.libraryUi?.read().shut || {} };
     return `<section class="lib-list"><div class="lib-tabs" role="tablist">${[["literature", "\u6587\u732E"], ["book", "\u4E66\u7C4D"], ["fav", "\u6536\u85CF"]].map(([k2, l2]) => B3("library-tab", k2, l2, l2, `role="tab" aria-selected="${tab === k2}"`)).join("")}</div>
- <label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6807\u9898\u3001\u4F5C\u8005\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>
+ <label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6807\u9898\u3001\u4F5C\u8005\u3001\u7C7B\u522B\u3001\u6807\u7B7E\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>
  <div class="lib-groups">${groups.map(([label, items]) => `<div class="lib-group ${shut[label] ? "is-shut" : ""}">${B3("library-group", label, `${svg3(ink2(shut[label] ? [[7, 4], [13, 10], [7, 16]] : [[4, 7], [10, 13], [16, 7]], 1.3))}<b>${label}</b><span class="mono">${items.length}</span>`, label)}<ul>${items.map(([k2, x2]) => listRow(k2, x2)).join("")}</ul></div>`).join("")}</div></section>`;
   }
   // 知识库详情里摘要、笔记、标注、相关四块文字用「阅读模式」显示：按 Markdown 渲染，段落、列表、引用、链接都正常，不再挤成一团
