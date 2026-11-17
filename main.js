@@ -11012,12 +11012,13 @@ function libraryPage(a2) {
       };
       const wOf = (it) => Math.min(avail, Math.max(96, titleW(it), dateW(it)));
       // 一行排不下就换到下一行
-      const chunk = (list2) => {
+      // reserve：这一行后面还要放「+N / 收起」按钮时留出的宽度（只影响第一行）
+      const chunk = (list2, reserve = 0) => {
         const lines = [];
         let line = [], used = 0;
         for (const it of list2) {
           const w3 = wOf(it);
-          if (line.length && used + 14 + w3 > avail) {
+          if (line.length && used + 14 + w3 > (lines.length ? avail : avail - reserve)) {
             lines.push(line);
             line = [];
             used = 0;
@@ -11051,7 +11052,7 @@ function libraryPage(a2) {
         const emit = (g2) => {
           const n2 = seq.get(g2.week) || 0;
           seq.set(g2.week, n2 + 1);
-          const key = prefix + "|" + g2.week + "#" + n2, open = !!rowOpen[key], many = g2.items.length > 1, lines = chunk(many && !open ? g2.items.slice(0, 1) : g2.items);
+          const key = prefix + "|" + g2.week + "#" + n2, open = !!rowOpen[key], many = g2.items.length > 1, lines = chunk(many && !open ? g2.items.slice(0, 1) : g2.items, many ? 76 : 0);
           if (many) lines[0].toggle = { key, hidden: g2.items.length - 1, open };
           out2.push(...lines);
         };
