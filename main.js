@@ -11310,8 +11310,15 @@ ${item.conclusion}`)}</pre>` : ""}
     const m2 = meta(kind, item), sel = d.ui.librarySelected?.kind === kind && d.ui.librarySelected.id === item.id, v2 = pct(kind, item);
     return `<li class="lib-row ${sel ? "is-selected" : ""} ${matches(kind, item) ? "" : "is-unmatched"}">${B3("library-pick", kind + "|" + item.id, `<span class="lib-row-ring">${ring(v2)}</span><span class="lib-row-main"><b>${esc2(item.title)}</b><small>${esc2(m2.authors)} \xB7 ${m2.year}<i>${m2.type}</i></small></span><span class="lib-row-end mono">${v2 > 0 && v2 < 100 ? v2 + "%" : v2 === 100 ? item.readDate ? fmtDay(item.readDate) : "\u8BFB\u5B8C" : fmtDay(m2.added)}</span>`, item.title)}</li>`;
   }
+  // 书架页左边列表里书籍的顺序：读完按读完日期，越近的越靠上；在读按进度，进度大的靠上；想读保持原来的顺序
+  const shelfOrder = (kind, stage2, list2) => {
+    if (kind !== "book") return list2;
+    if (stage2 === "done") return list2.slice().sort((a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || "")));
+    if (stage2 === "reading") return list2.slice().sort((a3, b3) => pct(kind, b3) - pct(kind, a3));
+    return list2;
+  };
   function listPane() {
-    const tab = d.ui.libraryTab || "literature", groups = tab === "fav" ? [["\u6536\u85CF", [...d.literature.map((x2) => ["literature", x2]), ...d.books.map((x2) => ["book", x2])].filter(([k2, x2]) => meta(k2, x2).fav)]] : [...stages[tab].map(([s, l2]) => [l2, records(tab).filter((x2) => x2.stage === s).map((x2) => [tab, x2])]), ...tab === "literature" ? [["\u653E\u5F03", d.literature.filter((x2) => x2.stage === "dropped").map((x2) => ["literature", x2])]] : []];
+    const tab = d.ui.libraryTab || "literature", groups = tab === "fav" ? [["\u6536\u85CF", [...d.literature.map((x2) => ["literature", x2]), ...d.books.map((x2) => ["book", x2])].filter(([k2, x2]) => meta(k2, x2).fav)]] : [...stages[tab].map(([s, l2]) => [l2, shelfOrder(tab, s, records(tab).filter((x2) => x2.stage === s)).map((x2) => [tab, x2])]), ...tab === "literature" ? [["\u653E\u5F03", d.literature.filter((x2) => x2.stage === "dropped").map((x2) => ["literature", x2])]] : []];
     const shut = d.ui.libraryShut ??= { "\u653E\u5F03": true, ...a2.libraryUi?.read().shut || {} };
     return `<section class="lib-list"><div class="lib-tabs" role="tablist">${[["literature", "\u6587\u732E"], ["book", "\u4E66\u7C4D"], ["fav", "\u6536\u85CF"]].map(([k2, l2]) => B3("library-tab", k2, l2, l2, `role="tab" aria-selected="${tab === k2}"`)).join("")}</div>
  <label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6807\u9898\u3001\u4F5C\u8005\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>
