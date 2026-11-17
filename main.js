@@ -11010,6 +11010,7 @@ function libraryPage(a2) {
     else if(field==="stage") control=`<select name="value">${[...stages[sel.kind], ["dropped","放弃"]].map(([v,l])=>`<option value="${v}" ${item.stage===v?"selected":""}>${l}</option>`).join("")}</select>`;
     else if(field==="conclusion") control=`<textarea name="value" rows="3" aria-label="一句话结论">${esc2(value||"")}</textarea>`;
     else if(field==="keywords") control=`<textarea name="value" rows="2" aria-label="关键词，用顿号、逗号、分号或换行分隔" placeholder="例如：写作、读者">${esc2(value||"")}</textarea><div class="lib-keyword-feedback">${keywordPreview(value)}</div>`;
+    else if(field==="progress" && sel.kind==="literature") control=`<label>进度 %<input name="value" type="number" min="0" max="100" step="0.01" value="${pct(sel.kind,item)}"></label>`;
     else if(field==="progress") control=`<label>当前页<input name="currentPage" type="number" min="0" step="1" value="${m.currentPage??""}"></label><label>总页数<input name="totalPages" type="number" min="1" step="1" value="${m.totalPages??""}"></label><label>或进度 %<input name="value" type="number" min="0" max="100" step="0.01" value="${pct(sel.kind,item)}"></label>`;
     else control=`<input name="value" aria-label="${field}" type="${field==="added"?"date":field==="year"?"number":"text"}" value="${esc2(value??"")}">`;
     return `<form class="lib-inline-editor" data-p2-form="library-field" data-field="${field}">${control}</form>`;
@@ -11157,7 +11158,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
   }
   function sidePane(kind, item) {
     const m2 = meta(kind, item), v2 = pct(kind, item), eta = v2 >= 100 ? "\u5DF2\u8BFB\u5B8C" : v2 > 0 ? "\u2014" : "\u672A\u5F00\u59CB";
-    return `<section class="lib-side"><div class="lib-mini hand-panel"><h4>\u9605\u8BFB\u8FDB\u5EA6</h4><div class="lib-progress"><span class="lib-big-ring">${ring(v2, 26, 2.2)}<b class="mono">${v2}%</b></span><dl><div><dt>\u6536\u5F55</dt><dd>${fmt(m2.added)}</dd></div><div><dt>\u5F00\u59CB\u9605\u8BFB</dt><dd>${v2 > 0 ? fmt(m2.started) : "\u2014"}</dd></div><div><dt>${v2 >= 100 ? "\u8BFB\u5B8C" : "\u9884\u8BA1\u5B8C\u6210"}</dt><dd>${item.readDate ? fmt(item.readDate) : eta}</dd></div></dl></div><form class="lib-page-progress" data-p2-form="library-progress" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><label>当前页<input name="currentPage" type="number" min="0" step="1" required aria-label="当前页" value="${m2.currentPage ?? ''}" style="width:100%;min-width:0"></label><label>总页数<input name="totalPages" type="number" min="1" step="1" required aria-label="总页数" value="${m2.totalPages ?? ''}" style="width:100%;min-width:0"></label><button type="submit" class="text-button" style="grid-column:1/-1;justify-self:end">保存进度</button></form></div>
+    return `<section class="lib-side"><div class="lib-mini hand-panel"><h4>\u9605\u8BFB\u8FDB\u5EA6</h4><div class="lib-progress"><span class="lib-big-ring">${ring(v2, 26, 2.2)}<b class="mono">${v2}%</b></span><dl><div><dt>\u6536\u5F55</dt><dd>${fmt(m2.added)}</dd></div><div><dt>\u5F00\u59CB\u9605\u8BFB</dt><dd>${v2 > 0 ? fmt(m2.started) : "\u2014"}</dd></div><div><dt>${v2 >= 100 ? "\u8BFB\u5B8C" : "\u9884\u8BA1\u5B8C\u6210"}</dt><dd>${item.readDate ? fmt(item.readDate) : eta}</dd></div></dl></div>${kind === "literature" ? `<form class="lib-page-progress" data-p2-form="library-progress" style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px"><label>进度 %<input name="progress" type="number" min="0" max="100" step="0.01" required aria-label="阅读进度（百分比）" value="${v2}" style="width:100%;min-width:0"></label><button type="submit" class="text-button" style="justify-self:end">保存进度</button></form>` : `<form class="lib-page-progress" data-p2-form="library-progress" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><label>当前页<input name="currentPage" type="number" min="0" step="1" required aria-label="当前页" value="${m2.currentPage ?? ''}" style="width:100%;min-width:0"></label><label>总页数<input name="totalPages" type="number" min="1" step="1" required aria-label="总页数" value="${m2.totalPages ?? ''}" style="width:100%;min-width:0"></label><button type="submit" class="text-button" style="grid-column:1/-1;justify-self:end">保存进度</button></form>`}</div>
  <div class="lib-mini hand-panel"><h4>\u6211\u7684\u6807\u7B7E</h4><div class="lib-tags">${m2.keywords.map((k2) => `<span class="lib-chip">${esc2(k2)}${B3("library-untag", k2, "\xD7", "\u79FB\u9664\u6807\u7B7E " + k2)}</span>`).join("")}<form class="lib-tag-form" data-p2-form="library-tag"><input name="tag" placeholder="+ \u6DFB\u52A0\u6807\u7B7E" aria-label="\u6DFB\u52A0\u6807\u7B7E"></form></div></div>
  <div class="lib-mini hand-panel lib-linked-notes"><details open><summary>读书笔记 · ${noteLinks(kind, item).length}</summary><ul class="lib-note-tree">${noteLinks(kind, item).map(l => `<li>${B3("library-note-open", encodeURIComponent(JSON.stringify([l.target,item.id])), esc2(l.label), "打开笔记 " + l.label, 'class="lib-note-leaf"')}</li>`).join("") || '<li>在笔记中填写 [[笔记名]] 即可关联。</li>'}</ul></details></div>
  <div class="lib-mini hand-panel"><h4>\u76F8\u5173\u5185\u5BB9</h4><ul class="lib-related">${related(kind, item).slice(0, 3).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0\u540C\u9879\u76EE\u7684\u8BB0\u5F55</li>'}</ul></div>
@@ -11348,7 +11349,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
       else if(field==="stage") { item.stage=value; if(["done","deep-done"].includes(value)) item.readDate=d.clock.date; }
       else if(field==="keywords") m.keywords=parseLibraryKeywords(value);
       else if(field==="progress") {
-        const current=f.elements.currentPage.value, total=f.elements.totalPages.value;
+        const current=f.elements.currentPage?.value ?? "", total=f.elements.totalPages?.value ?? "";
         if(current!=="" && total!=="") {
           if(Number(current)>Number(total)) { f.elements.currentPage.setCustomValidity("当前页不能超过总页数");f.elements.currentPage.reportValidity();return true; }
           m.currentPage=Number(current);m.totalPages=Number(total);m.progress=Math.round(Number(current)/Number(total)*10000)/100;
@@ -11356,6 +11357,20 @@ ${item.conclusion}`)}</pre>` : ""}</div>
         syncBookStage(sel.kind,item,m);
       } else m[field]=field==="year"?(value?Number(value):null):value;
       d.ui.libraryEditing=null;if(!quiet)a2.update();return true;
+    }
+    if (f.dataset.p2Form === "library-progress" && sel && f.elements.progress) {
+      const v3 = Number(f.elements.progress.value), box = f.elements.progress, m = meta(sel.kind, find(sel.kind, sel.id));
+      box.setCustomValidity("");
+      if (!Number.isFinite(v3) || v3 < 0 || v3 > 100) {
+        box.setCustomValidity("进度须为 0 到 100 之间的数");
+        box.reportValidity();
+        return true;
+      }
+      m.currentPage = null;
+      m.totalPages = null;
+      m.progress = Math.round(v3 * 100) / 100;
+      a2.update();
+      return true;
     }
     if (f.dataset.p2Form === "library-progress" && sel) {
       const current = Number(f.elements.currentPage.value), total = Number(f.elements.totalPages.value);
