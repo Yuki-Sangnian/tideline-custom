@@ -10893,6 +10893,15 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     if (key === "library-view") $5(id === "shelf" ? ".lib-back" : ".lib-view-toggle")?.focus();
     return true;
   }
+  // 书的阅读阶段跟着进度走：进度到 100%（或当前页等于总页数）→ 读完；进度从 0 变成有（或当前页不是 0）→ 想读改为在读。放弃的书不动
+  function syncBookStage(kind, item, m) {
+    if (kind !== "book" || !item || !["want", "reading"].includes(item.stage)) return;
+    const progress = Number(m.progress) || 0, page = Number(m.currentPage) || 0, total = Number(m.totalPages) || 0;
+    if (progress >= 100 || (total > 0 && page === total)) {
+      item.stage = "done";
+      item.readDate = d.clock.date;
+    } else if (item.stage === "want" && (progress > 0 || page > 0)) item.stage = "reading";
+  }
   function submit(f, quiet=false) {
     const sel = d.ui.librarySelected;
     if (f.dataset.p2Form === "library-field" && sel) {
@@ -10907,6 +10916,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
           if(Number(current)>Number(total)) { f.elements.currentPage.setCustomValidity("当前页不能超过总页数");f.elements.currentPage.reportValidity();return true; }
           m.currentPage=Number(current);m.totalPages=Number(total);m.progress=Math.round(Number(current)/Number(total)*10000)/100;
         } else {m.currentPage=null;m.totalPages=null;m.progress=Number(value);}
+        syncBookStage(sel.kind,item,m);
       } else m[field]=field==="year"?(value?Number(value):null):value;
       d.ui.libraryEditing=null;if(!quiet)a2.update();return true;
     }
@@ -10922,6 +10932,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
       m.currentPage = current;
       m.totalPages = total;
       m.progress = Math.round(current / total * 10000) / 100;
+      syncBookStage(sel.kind, find(sel.kind, sel.id), m);
       a2.update();
       return true;
     }
