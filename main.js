@@ -10922,21 +10922,14 @@ ${item.conclusion}`)}</pre>` : ""}
     mdStore.set(key, String(text || ""));
     return `<div class="lib-abstract lib-reading markdown-rendered" data-lib-md="${key}" data-lib-source="${esc2(source || "")}"${key === "abstract" ? ' data-lib-fold="para"' : ""}></div>`;
   }
-  // 摘要最多显示第一段，关键信息每条最多两行；没显示完的在下面放「展开 / 收起」
+  // 摘要最多显示两行，关键信息每条最多两行；没显示完的在下面放「展开 / 收起」
   const foldLabel = (open) => open ? "收起 △" : "展开 ▽";
   function foldParas(el) {
     try {
       if (el.dataset.libFold !== "para" || !el.isConnected) return;
-      const kids = [...el.children].filter((k2) => k2.textContent.trim() || k2.querySelector("img,hr,table"));
-      if (kids.length < 2) return;
-      const first = kids[0];
-      let after = false;
-      for (const k2 of el.children) {
-        if (after) k2.classList.add("lib-fold-hide");
-        if (k2 === first) after = true;
-      }
       const key = "abs|" + (el.dataset.libSource || ""), open = !!(d.ui.libFold ||= {})[key];
       el.classList.toggle("is-open", open);
+      if (!open && el.scrollHeight <= el.clientHeight + 1) return;
       el.insertAdjacentHTML("afterend", `<button type="button" class="lib-fold-toggle" data-lib-fold-btn="${esc2(key)}" aria-expanded="${open}">${foldLabel(open)}</button>`);
     } catch (e) {
       console.error("Tideline library fold", e);

@@ -4082,11 +4082,12 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .markdown-rendered :is(h4,h5,h6){font-size:15px!important}
 
 /* 知识库摘要只显示第一段、关键信息每条最多两行，没显示完的有「展开 / 收起」 */
-.compass-root .lib-reading:not(.is-open) > .lib-fold-hide{display:none}
+.compass-root .lib-reading[data-lib-fold="para"]:not(.is-open){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.compass-root .lib-record .lib-fold-toggle + h4{margin-top:6px}
 .compass-root .lib-points .lib-point{flex:1;min-width:0}
 .compass-root .lib-points .lib-point-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .compass-root .lib-points li.is-open .lib-point-text{display:block;-webkit-line-clamp:unset;overflow:visible}
-.compass-root .lib-fold-toggle{display:block;margin:2px 0 0;padding:2px 0;border:0;background:none;box-shadow:none;font-size:12px;line-height:1.5;color:var(--secondary);cursor:pointer}
+.compass-root .lib-fold-toggle{display:block;margin:2px 0 0;padding:2px 0 1px;border:0;background:none;box-shadow:none;font-size:12px;line-height:1.5;color:var(--secondary);cursor:pointer}
 .compass-root .lib-fold-toggle:is(:hover,:focus-visible){color:var(--ink);outline:none}
 
 /* 输入 # / @ 时弹出的已有标签 / 人物列表（记录框、想法输入框） */
