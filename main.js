@@ -10936,6 +10936,12 @@ function libraryPage(a2) {
   }
   // 每个阶段下面的纸签怎么排：在读按进度从小到大；读完按读完日期，越晚读完越靠上、越早越沉底，同一天读完的横着排成一行；其他阶段按原顺序
   const foldMap = () => d.ui.libraryFold ||= { ...a2.libraryUi?.read().fold || {} };
+  const yearOpenMap = () => d.ui.libraryYearOpen ||= { ...a2.libraryUi?.read().yearOpen || {} };
+  function toggleYear(key) {
+    const yo = yearOpenMap(), year = Number(key.split("|")[2]), cur = key in yo ? !!yo[key] : year === 0 || year === Number(String(d.clock.date).slice(0, 4));
+    yo[key] = !cur;
+    a2.libraryUi?.write({ yearOpen: { ...yo } });
+  }
   function toggleFold(kind, stage2) {
     const fold = foldMap(), key = kind + "|" + stage2;
     if (fold[key]) delete fold[key];
@@ -10944,7 +10950,11 @@ function libraryPage(a2) {
   }
   function seaLayout(w2, h) {
     const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
-    const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap();
+    const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap(), yearOpen = yearOpenMap(), thisYear = Number(String(d.clock.date).slice(0, 4));
+    const yearOf = (it) => {
+      const m3 = /^(\d{4})/.exec(String(it.readDate || ""));
+      return m3 ? Number(m3[1]) : 0;
+    };
     const plan = [["literature", litX, litArea], ["book", bookX, bookArea]].map(([kind, x2, area]) => {
       const span = area[1] - area[0], cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
       const groups = stages[kind].map(([s]) => {
@@ -10968,14 +10978,39 @@ function libraryPage(a2) {
           }
           rows = [...days.values()].flatMap(chunk);
         } else rows = chunk(items);
-        return { rows: shut ? [] : rows, shut, count: items.length };
+        // 「读完」「已泛读」「已精读」里有往年读完的：按年份分成小绳结，每年可以折叠 / 展开（今年默认展开，往年默认折叠）
+        let sections = null;
+        const yearStage = kind === "book" && s === "done" || kind === "literature" && (s === "skimmed" || s === "deep-done");
+        if (yearStage && !shut && items.some((it) => yearOf(it) && yearOf(it) !== thisYear)) {
+          const byYear = new Map();
+          for (const it of items) {
+            const y3 = yearOf(it);
+            if (!byYear.has(y3)) byYear.set(y3, []);
+            byYear.get(y3).push(it);
+          }
+          sections = [...byYear.keys()].sort((a3, b3) => (a3 === 0) - (b3 === 0) || b3 - a3).map((y3) => {
+            const list2 = byYear.get(y3).slice().sort((a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || ""))), key = kind + "|" + s + "|" + y3, open = key in yearOpen ? !!yearOpen[key] : y3 === 0 || y3 === thisYear;
+            let rws;
+            if (kind === "book") {
+              const days = new Map();
+              for (const it of list2) {
+                const day = it.readDate || "";
+                if (!days.has(day)) days.set(day, []);
+                days.get(day).push(it);
+              }
+              rws = [...days.values()].flatMap(chunk);
+            } else rws = chunk(list2);
+            return { year: y3, key, label: y3 ? String(y3) : "未记日期", count: list2.length, open, rows: open ? rws : [] };
+          });
+        }
+        return { rows: shut || sections ? [] : rows, sections, shut, count: items.length };
       });
-      const need = groups.map((g2) => 18 + g2.rows.length * (ch + gap) + 6);
+      const need = groups.map((g2) => g2.sections ? 22 + g2.sections.reduce((n2, sec) => n2 + (sec.open ? 14 + sec.rows.length * (ch + gap) + 12 : 30), 0) + 6 : 18 + g2.rows.length * (ch + gap) + 6);
       return { kind, x2, area, cols, cw, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
     });
     // 内容多到放不下时，整页往下加长（绳子也跟着变长）；少了再缩回来
     const H = Math.max(h, y0 + Math.max(...plan.map((p) => p.total)) + 104), y1 = H - 104;
-    const out = { w: w2, h: H, H, litX, bookX, y0, y1, ch, cards: [], levels: [], detail: detail2, drift: [] };
+    const out = { w: w2, h: H, H, litX, bookX, y0, y1, ch, cards: [], levels: [], years: [], detail: detail2, drift: [] };
     for (const { kind, x2, area, cols, cw, groups, need, total } of plan) {
       const n = stages[kind].length, step = (y1 - y0) / n, extra = Math.max(0, y1 - y0 - total), steps = need.every((v2) => v2 <= step) ? need.map(() => step) : need.map((v2) => v2 + extra / n);
       let yy = y0;
@@ -10986,6 +11021,15 @@ function libraryPage(a2) {
         g2.rows.forEach((row, r) => row.forEach((item, col) => {
           out.cards.push({ kind, item, col, row: r, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: y2 + 18 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
         }));
+        let off = 0;
+        for (const sec of g2.sections || []) {
+          const sy = y2 + 22 + off;
+          out.years.push({ kind, stage: stage2, year: sec.year, key: sec.key, label: sec.label, count: sec.count, open: sec.open, x: x2, y: sy });
+          sec.rows.forEach((row, r) => row.forEach((item, col) => {
+            out.cards.push({ kind, item, col, row: r, sec: sec.key, sy, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: sy + 14 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
+          }));
+          off += sec.open ? 14 + sec.rows.length * (ch + gap) + 12 : 30;
+        }
       });
     }
     d.literature.filter((l2) => l2.stage === "dropped").forEach((item, i2) => out.drift.push({ kind: "literature", item, x: litX + 30 + i2 * 174, y: H - 74, w: 150, h: 34, rot: i2 % 2 ? 4 : -5 }));
@@ -11050,6 +11094,7 @@ ${item.conclusion}`)}</pre>` : ""}
       html += `<div class="library-depth-zone p2-background-hit" data-p2-drop="paper:${v2.kind}:${v2.stage}" style="left:${v2.x - 12}px;top:${v2.y - 12}px;width:${zoneW}px;height:${Math.round(v2.step)}px" aria-label="${v2.label}"></div>`;
       html += B3("library-fold", v2.kind + "|" + v2.stage, `<b>${v2.label}<i class="lib-fold-mark">${v2.shut ? "▸" : "▾"}</i></b><span class="mono">${v2.shut ? v2.count + " 项 · " : ""}${v2.depth}</span>`, (v2.shut ? "展开" : "折叠") + v2.label, `class="lib-depth lib-depth-btn" aria-expanded="${!v2.shut}" style="left:${v2.x - 18}px;top:${v2.y - 10}px"`) + B3("library-knot", v2.kind + "|" + stages[v2.kind].findIndex((s) => s[0] === v2.stage), svg3(circle2(9, 9, 5, 1.3), 18), v2.label, `class="library-knot" data-knot-hover="${v2.kind}|${stages[v2.kind].findIndex((s) => s[0] === v2.stage)}" style="left:${v2.x - 9}px;top:${v2.y - 9}px"`);
     }
+    for (const yv of L3.years) html += B3("library-year", yv.key, `<b>${esc2(yv.label)}<i class="lib-fold-mark">${yv.open ? "▾" : "▸"}</i></b><span class="mono">${yv.count} ${yv.kind === "book" ? "本" : "篇"}</span>`, (yv.open ? "折叠" : "展开") + yv.label + (yv.year ? "年" : ""), `class="lib-depth lib-year-btn" aria-expanded="${yv.open}" style="left:${yv.x - 14}px;top:${yv.y - 9}px"`);
     html += L3.cards.map((c) => tag(c)).join("") + L3.drift.map((c) => tag(c, "drifted")).join("") + noteBranches(L3);
     if (L3.drift.length) html += `<span class="lib-drift-note" style="left:${L3.drift.at(-1).x + L3.drift.at(-1).w + 16}px;top:${L3.H - 62}px">\u6C89\u5E95 \xB7 \u5DF2\u653E\u5F03</span>`;
     html += "</div>" + toolbar();
@@ -11303,6 +11348,8 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     } else if (key === "library-pdf") {
       a2.openPDF?.(d.ui.librarySelected?.id);
       return true;
+    } else if (key === "library-year") {
+      toggleYear(id);
     } else if (key === "library-fold") {
       const [k2, st] = id.split("|");
       toggleFold(k2, st);
@@ -11566,9 +11613,13 @@ ${item.conclusion}`)}</pre>` : ""}</div>
       for (const v2 of L3.levels.filter((v3) => v3.kind === kind)) {
         const cs = L3.cards.filter((c) => c.kind === kind && c.ky === v2.y), end = cs.length ? Math.max(...cs.map((c) => c.x + c.w - 14)) : x2 + 40;
         s += ink2([[x2 + 5, v2.y], [end, v2.y + 1.5]], 0.8) + circle2(x2, v2.y, 6.5, 1.3) + circle2(x2, v2.y, 2.4, 0.8);
+        for (const yv of (L3.years || []).filter((y3) => y3.kind === kind && y3.stage === v2.stage)) {
+          const ce = cs.filter((c) => c.sec === yv.key), e2 = ce.length ? Math.max(...ce.map((c) => c.x + c.w - 14)) : x2 + 36;
+          s += ink2([[x2 + 4, yv.y], [e2, yv.y + 1]], 0.6, M2) + circle2(x2, yv.y, 3.8, 1) + circle2(x2, yv.y, 1.2, 0.6);
+        }
         for (const c of cs) {
-          const up = cs.find((o) => o.col === c.col && o.row === c.row - 1), y0 = up ? up.y + up.h : v2.y + 1;
-          for (const sx of up ? [Math.max(c.x, up.x) + 18, Math.min(c.x + c.w, up.x + up.w) - 18] : [c.x + 16, c.x + c.w - 16]) s += ink2([[sx, y0], [sx, c.y]], 0.6, M2) + (up ? "" : circle2(sx, v2.y + 1, 1.3, 0.6));
+          const up = cs.find((o) => o.col === c.col && o.row === c.row - 1 && o.sec === c.sec), top = c.sy ?? v2.y, y0 = up ? up.y + up.h : top + 1;
+          for (const sx of up ? [Math.max(c.x, up.x) + 18, Math.min(c.x + c.w, up.x + up.w) - 18] : [c.x + 16, c.x + c.w - 16]) s += ink2([[sx, y0], [sx, c.y]], 0.6, M2) + (up ? "" : circle2(sx, top + 1, 1.3, 0.6));
         }
       }
       s += kind === "literature" ? `</g><g data-morph="sounding-weight">${F2([[x2 - 8, bottom], [x2 + 8, bottom], [x2 + 11, bottom + 20], [x2, bottom + 28], [x2 - 11, bottom + 20]])}${ink2([[x2 - 8, bottom], [x2 + 8, bottom], [x2 + 11, bottom + 20], [x2, bottom + 28], [x2 - 11, bottom + 20], [x2 - 8, bottom]], 1.4)}</g>` : `${ink2([[x2 - 6, bottom], [x2 + 6, bottom], [x2, bottom + 12], [x2 - 6, bottom]], 1.2)}</g>`;

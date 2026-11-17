@@ -4122,3 +4122,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root button.lib-depth:focus-visible{outline:none}
 .compass-root .lib-depth .lib-fold-mark{font-style:normal;font-size:10px;margin-left:5px;color:var(--secondary)}
 .compass-root #sheet:has(> #library[data-library-view="sea"]:not([hidden])){max-height:calc(100cqh - 128px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+
+/* 海图视图：「读完」「已泛读」「已精读」里往年读完的，按年份挂小绳结 */
+.compass-root .lib-year-btn b{font:400 12.5px/1.3 var(--serif);color:var(--ink)}
+.compass-root .lib-year-btn span{font-size:10px}
