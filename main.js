@@ -10951,6 +10951,22 @@ function libraryPage(a2) {
   function seaLayout(w2, h) {
     const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
     const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap(), yearOpen = yearOpenMap(), thisYear = Number(String(d.clock.date).slice(0, 4));
+    // 阶段里按年份分段：今年的直接排在阶段名下面（不挂年份小绳结），往年的各挂一个小绳结，且让出阶段名下面那行深度范围的位置
+    const secLayout = (sections) => {
+      let cur = 18;
+      const pos = [];
+      for (const sec of sections) {
+        if (sec.head) {
+          const sy = Math.max(cur + 10, 40);
+          pos.push({ sec, sy, top: sy + 14 });
+          cur = sy + (sec.open ? 14 + sec.rows.length * (ch + gap) + 4 : 22);
+        } else {
+          pos.push({ sec, sy: null, top: cur });
+          cur += sec.rows.length ? sec.rows.length * (ch + gap) + 8 : 0;
+        }
+      }
+      return { pos, h: cur + 6 };
+    };
     const yearOf = (it) => {
       const m3 = /^(\d{4})/.exec(String(it.readDate || ""));
       return m3 ? Number(m3[1]) : 0;
@@ -11000,12 +11016,12 @@ function libraryPage(a2) {
               }
               rws = [...days.values()].flatMap(chunk);
             } else rws = chunk(list2);
-            return { year: y3, key, label: y3 ? String(y3) : "未记日期", count: list2.length, open, rows: open ? rws : [] };
+            return { year: y3, key, head: y3 !== thisYear, label: y3 ? String(y3) : "未记日期", count: list2.length, open, rows: open ? rws : [] };
           });
         }
         return { rows: shut || sections ? [] : rows, sections, shut, count: items.length };
       });
-      const need = groups.map((g2) => g2.sections ? 40 + g2.sections.reduce((n2, sec) => n2 + (sec.open ? 14 + sec.rows.length * (ch + gap) + 12 : 30), 0) + 6 : 18 + g2.rows.length * (ch + gap) + 6);
+      const need = groups.map((g2) => g2.sections ? secLayout(g2.sections).h : 18 + g2.rows.length * (ch + gap) + 6);
       return { kind, x2, area, cols, cw, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
     });
     // 内容多到放不下时，整页往下加长（绳子也跟着变长）；少了再缩回来
@@ -11021,14 +11037,11 @@ function libraryPage(a2) {
         g2.rows.forEach((row, r) => row.forEach((item, col) => {
           out.cards.push({ kind, item, col, row: r, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: y2 + 18 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
         }));
-        let off = 0;
-        for (const sec of g2.sections || []) {
-          const sy = y2 + 40 + off;
-          out.years.push({ kind, stage: stage2, year: sec.year, key: sec.key, label: sec.label, count: sec.count, open: sec.open, x: x2, y: sy });
+        if (g2.sections) for (const { sec, sy, top } of secLayout(g2.sections).pos) {
+          if (sy != null) out.years.push({ kind, stage: stage2, year: sec.year, key: sec.key, label: sec.label, count: sec.count, open: sec.open, x: x2, y: y2 + sy });
           sec.rows.forEach((row, r) => row.forEach((item, col) => {
-            out.cards.push({ kind, item, col, row: r, sec: sec.key, sy, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: sy + 14 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
+            out.cards.push({ kind, item, col, row: r, sec: sec.key, sy: sy != null ? y2 + sy : void 0, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: y2 + top + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
           }));
-          off += sec.open ? 14 + sec.rows.length * (ch + gap) + 12 : 30;
         }
       });
     }
