@@ -10995,8 +10995,10 @@ function libraryPage(a2) {
       return m3 ? Number(m3[1]) : 0;
     };
     const plan = [["literature", litX, litArea], ["book", bookX, bookArea]].map(([kind, x2, area]) => {
-      const span = area[1] - area[0];
-      let cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
+      const span0 = area[1] - area[0];
+      let cols = span0 >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span0 - (cols - 1) * 14) / cols)), span = span0;
+      // 书籍：读书笔记默认收起，右边空着，所以同一个月读完的可以一直横着排到页面右边
+      if (kind === "book") span = Math.max(span0, w2 - 48 - area[0]);
       // 纸签宽度跟着书名走：保证最长的书名也能完整写在一行里（两列放不下就改成一列）
       const titleW = (it) => {
         let w3 = 0;
@@ -11004,13 +11006,16 @@ function libraryPage(a2) {
         return Math.ceil(16 + w3 + (it.projectIds.length ? 34 : 12) + (kind === "book" && noteLinks(kind, it).length ? 24 : 0) + 6);
       };
       const wide = Math.max(0, ...records(kind).map(titleW));
-      if (wide > cw) {
+      if (kind === "book") {
+        if (wide > cw) cw = Math.min(span, wide);
+        cols = Math.max(1, Math.min(6, Math.floor((span - 10 + 14) / (cw + 14))));
+      } else if (wide > cw) {
         if (cols === 2 && wide * 2 + 14 + 10 > span) cols = 1;
         cw = Math.min(cols === 2 ? Math.floor((span - 24) / 2) : span, wide);
       }
-      const chunk = (list2) => {
+      const chunk = (list2, n2 = cols) => {
         const out2 = [];
-        for (let i = 0; i < list2.length; i += cols) out2.push(list2.slice(i, i + cols));
+        for (let i = 0; i < list2.length; i += n2) out2.push(list2.slice(i, i + n2));
         return out2;
       };
       // 打开了读书笔记的书单独占一行（右边接着它的读书笔记）
@@ -11018,7 +11023,7 @@ function libraryPage(a2) {
         const out2 = [];
         let seg = [];
         const flush = () => {
-          out2.push(...chunk(seg));
+          out2.push(...chunk(seg, Math.min(cols, 2)));
           seg = [];
         };
         for (const it of list2) {
