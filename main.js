@@ -5515,7 +5515,7 @@ function makeDocx(title) {
 }
 function libraryFileFlow({ plugin, view, path, kind, title }) {
   const app = plugin.app, O = import_obsidian7, book = kind === "book";
-  const safe = String(title || path.split("/").pop().replace(/\.md$/, "")).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim() || (book ? "书籍" : "文献"), folder = "附件/" + (book ? "书籍" : "文献");
+  const safe = String(title || path.split("/").pop().replace(/\.md$/, "")).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim() || (book ? "书籍" : "文献"), folder = "x/" + (book ? "书籍" : "文献");
   const fail = (e) => view.frame.feedback("操作失败：" + (e?.message || e));
   const finish = async (file, msg, move) => {
     if (move && !file.path.startsWith(folder + "/")) {
@@ -5575,12 +5575,12 @@ function libraryFileFlow({ plugin, view, path, kind, title }) {
     p.setPlaceholder("搜索知识库里的 PDF、Word 或 MD 文件…");
     p.open();
   }, true);
-  choice("新建 Word 文件", "在「附件/" + (book ? "书籍" : "文献") + "」文件夹里新建一个 .docx 并用 Word 打开", async () => {
+  choice("新建 Word 文件", "在「x/" + (book ? "书籍" : "文献") + "」文件夹里新建一个 .docx 并用 Word 打开", async () => {
     await ensureFolder();
     const bytes = makeDocx(safe), file = await app.vault.createBinary(unique(safe, "docx"), bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     await finish(file, "已新建 Word 文件");
   });
-  choice("新建 MD 笔记", "在「附件/" + (book ? "书籍" : "文献") + "」文件夹里新建一篇 Markdown 笔记", async () => {
+  choice("新建 MD 笔记", "在「x/" + (book ? "书籍" : "文献") + "」文件夹里新建一篇 Markdown 笔记", async () => {
     await ensureFolder();
     const file = await app.vault.create(unique(safe + " 笔记", "md"), "# " + safe + "\n\n");
     await finish(file, "已新建 MD 笔记");
