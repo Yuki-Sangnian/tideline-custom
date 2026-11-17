@@ -10306,7 +10306,9 @@ function reviewPage(a2) {
   };
   const HABIT_GLYPH = [ink2([[7, 1.5], [3.2, 7.5], [3.6, 10.6], [7, 12.6], [10.4, 10.6], [10.8, 7.5], [7, 1.5]], 1.05), circle2(7, 2.6, 1.5, 1) + ink2([[7, 4.4], [7, 8.6]], 1.1) + ink2([[3, 5.6], [7, 6.4], [11, 5.6]], 1) + ink2([[7, 8.6], [4.6, 12.4]], 1) + ink2([[7, 8.6], [9.4, 12.4]], 1), ink2([[1.5, 3.5], [7, 4.6], [12.5, 3.5], [12.5, 11.5], [7, 12.4], [1.5, 11.5], [1.5, 3.5]], 1) + ink2([[7, 4.6], [7, 12.4]], 0.9), ink2([[9.6, 1.8], [6.2, 2.6], [3.6, 5.6], [3.4, 9.2], [5.8, 12], [9.4, 12.4], [12, 10.6], [8.6, 10], [6.6, 7.6], [7, 4.2], [9.6, 1.8]], 1)];
   function weekTrend() {
-    const t = d.review.trend, W2 = 440, H2 = 104, x0 = 30, x1 = 330, top = 12, base2 = 80, max = Math.ceil(Math.max(...t) / 10) * 10, X2 = (i) => x0 + i * (x1 - x0) / (t.length - 1), Y = (v2) => base2 - v2 / max * (base2 - top);
+    // 周数按本周的日期算（原来写死成了第 33–44 周）：趋势图最后一个点是本周，往前每个点早一周
+    const weekDate = (back) => new Date(Date.parse(d.review.weekDates[0] + "T12:00:00Z") - back * 7 * 864e5).toISOString().slice(0, 10);
+    const t = d.review.trend, wkNo = (i) => isoWeek2(weekDate(t.length - 1 - i)), W2 = 440, H2 = 104, x0 = 30, x1 = 330, top = 12, base2 = 80, max = Math.ceil(Math.max(...t) / 10) * 10, X2 = (i) => x0 + i * (x1 - x0) / (t.length - 1), Y = (v2) => base2 - v2 / max * (base2 - top);
     let s = "";
     for (const v2 of [0, max / 2, max]) {
       s += ink2([[x0 - 4, Y(v2)], [x1 + 6, Y(v2)]], 0.45, a2.TICK) + `<text x="${x0 - 9}" y="${Y(v2) + 3}" text-anchor="end" class="ax">${v2}</text>`;
@@ -10314,10 +10316,10 @@ function reviewPage(a2) {
     s += ink2(t.map((v2, i) => [X2(i), Y(v2)]), 1.35);
     t.forEach((v2, i) => {
       s += i === t.length - 1 ? `<circle cx="${X2(i)}" cy="${Y(v2)}" r="3.4" fill="#C8206A"/><text x="${X2(i) + 2}" y="${Y(v2) - 8}" class="now" text-anchor="middle">${v2}</text>` : `<circle cx="${X2(i)}" cy="${Y(v2)}" r="2.2" fill="${a2.INK}"/>`;
-      s += `<text x="${X2(i)}" y="${base2 + 16}" text-anchor="middle" class="ax">${33 + i}</text>`;
+      s += `<text x="${X2(i)}" y="${base2 + 16}" text-anchor="middle" class="ax">${wkNo(i)}</text>`;
     });
     s += `<text x="${x1 + 12}" y="${base2 + 16}" class="ax">\u5468</text><g transform="translate(${W2 - 62} ${base2 + 4})">${m2.tower(0, 0, 0.5)}${m2.rock(-30, 0, 0.6)}${m2.rock(26, 1, 0.45)}</g>` + a2.curve([[x1 + 30, base2 + 5], [W2 - 80, base2 + 3], [W2 - 40, base2 + 6], [W2 - 2, base2 + 4]], 0.6, a2.SECONDARY) + a2.curve([[x1 + 44, base2 + 10], [W2 - 30, base2 + 10]], 0.45, a2.TICK);
-    return `<div class="review-trend wk-trend"><svg viewBox="0 0 ${W2} ${H2}" aria-hidden="true">${s}</svg>${t.map((v2, i) => B3("review-trend", String(i), "", "\u7B2C " + (33 + i) + " \u5468\u5B8C\u6210 " + v2, `class="trend-point" style="left:${(X2(i) / W2 * 100).toFixed(2)}%;top:${(Y(v2) / H2 * 100).toFixed(2)}%"`)).join("")}<span id="review-trend-value" class="trend-value" hidden></span></div>`;
+    return `<div class="review-trend wk-trend"><svg viewBox="0 0 ${W2} ${H2}" aria-hidden="true">${s}</svg>${t.map((v2, i) => B3("review-trend", String(i), "", "\u7B2C " + wkNo(i) + " \u5468\u5B8C\u6210 " + v2, `class="trend-point" style="left:${(X2(i) / W2 * 100).toFixed(2)}%;top:${(Y(v2) / H2 * 100).toFixed(2)}%"`)).join("")}<span id="review-trend-value" class="trend-value" hidden></span></div>`;
   }
   function weekPage() {
     const days2 = d.review.days.map((_2, i) => day2(i)), scores = days2.map(score), maxDone = Math.max(5, ...days2.map((r) => r.done.length));
@@ -10339,7 +10341,7 @@ function reviewPage(a2) {
     const sleepDays = past.filter(r => r.sleepHours != null);
     const sleepAvg = sleepDays.length ? (sleepDays.reduce((n,r)=>n+r.sleepHours,0)/sleepDays.length).toFixed(1)+"h" : "—";
     const sum = `<div class="week-sum"><span>平均睡眠 <b class="mono">${sleepAvg}</b></span><span>\u672C\u5468\u81F3\u4ECA</span><span><b class="mono">${past.reduce((x2, r) => x2 + r.done.length, 0)}</b> \u4EF6\u5B8C\u6210</span><span>\u4E60\u60EF <b class="mono">${hab.filter(Boolean).length}/${hab.length}</b></span><span>\u72B6\u6001\u5747\u503C <b class="mono">${avg}</b></span><span>\u8BB0\u5F55 <b class="mono">${past.length}/7</b> \u5929</span></div>`;
-    const left = `<div class="log-left log-week log-scroll"><div class="log-page-head"><div class="log-date">2026 \u5E74 \u7B2C 44 \u5468</div><span class="log-weekday">${fmt(d.review.weekDates[0])} \u2013 ${fmt(d.review.weekDates[6])}</span></div>
+    const left = `<div class="log-left log-week log-scroll"><div class="log-page-head"><div class="log-date">${new Date(Date.parse(d.review.weekDates[0] + "T12:00:00Z") + 3 * 864e5).getUTCFullYear()} \u5E74 \u7B2C ${isoWeek2(d.review.weekDates[0])} \u5468</div><span class="log-weekday">${fmt(d.review.weekDates[0])} \u2013 ${fmt(d.review.weekDates[6])}</span></div>
  <section class="log-sec wk-trend-sec"><h4>${G3("route")}<span>\u6700\u8FD1 12 \u5468\u5B8C\u6210</span></h4>${weekTrend()}</section>
  <div class="week-table" style="--habit-columns:${d.habits.length};--habit-table-width:${Math.max(96,d.habits.length*32+48)}px"><div class="week-head"><span>\u65E5\u671F</span><span>\u5F53\u65E5\u5B8C\u6210</span><span class="wk-habit-head" style="--habit-columns:${d.habits.length}">${d.habits.map((h,j) => { const name=h.name||"", index=/喝|水/.test(name)?0:/运动|跑|健身|伸展/.test(name)?1:/读|书|写|抄/.test(name)?2:-1; return `<span title="${esc2(name)}" aria-label="${esc2(name)}">${/抄|写/.test(name) ? quillIcon() : index>=0 ? svg3(HABIT_GLYPH[index],14,14) : icon2("check",14)}<small>${esc2(name)}</small></span>`; }).join("")}<span title="睡眠时长">${svg3(HABIT_GLYPH[3],14,14)}</span></span><span>\u5F53\u65E5\u72B6\u6001</span></div>${rows}</div>${sum}</div>`;
     const all = (k2) => days2.flatMap((r) => r[k2].map((t) => ({ t, date: r.date })));
