@@ -16125,9 +16125,9 @@ function createTaskPlus(view) {
     flushTimer = setTimeout(() => {
       flushTimer = 0;
       touch();
-    }, 15000);
+    }, 60000);
   }
-  // 正文改了就等 15 秒再存；但离开输入框、切走窗口、关掉页面前会马上存，不会丢
+  // 正文改了就等 1 分钟再存；但离开输入框、切走窗口、关掉页面前会马上存，不会丢
   const flushNow = () => {
     if (!flushTimer) return;
     clearTimeout(flushTimer);
