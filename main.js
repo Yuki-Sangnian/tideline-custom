@@ -10995,7 +10995,19 @@ function libraryPage(a2) {
       return m3 ? Number(m3[1]) : 0;
     };
     const plan = [["literature", litX, litArea], ["book", bookX, bookArea]].map(([kind, x2, area]) => {
-      const span = area[1] - area[0], cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
+      const span = area[1] - area[0];
+      let cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
+      // 纸签宽度跟着书名走：保证最长的书名也能完整写在一行里（两列放不下就改成一列）
+      const titleW = (it) => {
+        let w3 = 0;
+        for (const ch2 of String(it.title)) w3 += ch2.charCodeAt(0) > 255 ? 13 : 7.2;
+        return Math.ceil(16 + w3 + (it.projectIds.length ? 34 : 12) + (kind === "book" && noteLinks(kind, it).length ? 24 : 0) + 6);
+      };
+      const wide = Math.max(0, ...records(kind).map(titleW));
+      if (wide > cw) {
+        if (cols === 2 && wide * 2 + 14 + 10 > span) cols = 1;
+        cw = Math.min(cols === 2 ? Math.floor((span - 24) / 2) : span, wide);
+      }
       const chunk = (list2) => {
         const out2 = [];
         for (let i = 0; i < list2.length; i += cols) out2.push(list2.slice(i, i + cols));

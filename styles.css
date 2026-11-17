@@ -4134,3 +4134,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #library .lib-tag .lib-notes-arrow:is(:hover,:focus-visible){outline:none;opacity:.7}
 .compass-root .lib-row-toggle{position:absolute;z-index:4;height:20px;padding:0 6px;border:0;background:none;box-shadow:none;font:12px/20px var(--serif);color:var(--secondary);cursor:pointer;white-space:nowrap}
 .compass-root .lib-row-toggle:is(:hover,:focus-visible){color:var(--ink);outline:none}
+
+/* 海图视图的纸签：书名写在一行里（宽度已按最长的书名算好），万一还放不下就用省略号 */
+.compass-root #library .lib-tag .paper-title > span{display:block;white-space:nowrap;-webkit-line-clamp:unset;overflow:hidden;text-overflow:ellipsis}
