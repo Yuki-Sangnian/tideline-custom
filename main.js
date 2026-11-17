@@ -11013,12 +11013,12 @@ function libraryPage(a2) {
       const wOf = (it) => Math.min(avail, Math.max(96, titleW(it), dateW(it)));
       // 一行排不下就换到下一行
       // reserve：这一行后面还要放「+N / 收起」按钮时留出的宽度（只影响第一行）
-      const chunk = (list2, reserve = 0) => {
+      const chunk = (list2, reserve = 0, maxPer = 99) => {
         const lines = [];
         let line = [], used = 0;
         for (const it of list2) {
           const w3 = wOf(it);
-          if (line.length && used + 14 + w3 > (lines.length ? avail : avail - reserve)) {
+          if (line.length && (line.length >= maxPer || used + 14 + w3 > (lines.length ? avail : avail - reserve))) {
             lines.push(line);
             line = [];
             used = 0;
@@ -11030,11 +11030,12 @@ function libraryPage(a2) {
         return lines;
       };
       // 打开了读书笔记的书单独占一行（右边接着它的读书笔记）
-      const chunkSolo = (list2) => {
+      // maxPer / zig：「想读」保持原来的排法——一行最多两本、按原顺序、单数行错开一点
+      const chunkSolo = (list2, maxPer = 99, zig = false) => {
         const out2 = [];
         let seg = [];
         const flush = () => {
-          out2.push(...chunk(seg));
+          out2.push(...chunk(seg, 0, maxPer));
           seg = [];
         };
         for (const it of list2) {
@@ -11044,6 +11045,7 @@ function libraryPage(a2) {
           } else seg.push(it);
         }
         flush();
+        if (zig) out2.forEach((l2) => l2.zig = true);
         return out2;
       };
       // 读完：同一个月读完的排成一行，默认只显示最近的一本，其余收在「+N」里
@@ -11088,7 +11090,7 @@ function libraryPage(a2) {
         } else if (kind === "book" && s === "done") {
           items = items.slice().sort(byDateDesc);
           rows = weekRows(items, prefix);
-        } else rows = kind === "book" ? chunkSolo(items) : chunk(items);
+        } else rows = kind === "book" ? chunkSolo(items, 2, true) : chunk(items);
         // 「读完」「已泛读」「已精读」里有往年读完的：往年的按年份挂小绳结，每年可以折叠 / 展开（往年默认折叠）
         let sections = null;
         const yearStage = kind === "book" && s === "done" || kind === "literature" && (s === "skimmed" || s === "deep-done");
@@ -11122,7 +11124,7 @@ function libraryPage(a2) {
           out.levels.push({ kind, stage: stage2, label, depth, x: x2, y: y2, step: step2, area, shut: g2.shut, count: g2.count });
           const putRows = (rowsList, top, sec, sy) => rowsList.forEach((row, r) => {
             const ry = top + r * (ch + gap);
-            let cx = area[0];
+            let cx = area[0] + (row.zig && r % 2 ? 10 : 0);
             row.forEach((item, col) => {
               const w3 = wOf(item);
               out.cards.push({ kind, item, col, row: r, sec, sy, x: cx, y: ry, w: w3, h: ch, ky: y2, rx: x2 });
