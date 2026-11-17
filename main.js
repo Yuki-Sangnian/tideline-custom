@@ -11475,19 +11475,32 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     const q3 = token.query.trim().toLowerCase(), sel = d.ui.librarySelected, own = new Set(sel ? meta(sel.kind, find(sel.kind, sel.id))?.keywords || [] : []);
     return [...keywordStats()].filter(([k2]) => !own.has(k2) && k2.toLowerCase().includes(q3)).sort((x3, y3) => y3[1] - x3[1] || x3[0].localeCompare(y3[0], "zh-Hans")).slice(0, 8).map(([k2, n2]) => ({ insert: k2, label: k2 + (n2 > 1 ? " (" + n2 + ")" : "") }));
   };
+  // 类别（type）：只选一个，点开就列出已有的类别（同是书籍或同是文献的），边打字边筛；列表里没有的，直接打新的、回车就是新类别
+  const typeItems = (token) => {
+    const sel = d.ui.librarySelected, q3 = token.query.trim().toLowerCase(), count = new Map();
+    for (const [kind, list2] of [["literature", d.literature], ["book", d.books]]) {
+      if (sel && kind !== sel.kind) continue;
+      for (const it of list2) {
+        const t2 = String(meta(kind, it).type || "").trim();
+        if (t2) count.set(t2, (count.get(t2) || 0) + 1);
+      }
+    }
+    return [...count].filter(([t2]) => !q3 || t2.toLowerCase().includes(q3)).sort((x3, y3) => y3[1] - x3[1] || x3[0].localeCompare(y3[0], "zh-Hans")).slice(0, 12).map(([t2, n2]) => ({ insert: t2, label: t2 + " (" + n2 + ")" }));
+  };
   let kwBound = null;
   HOST.addEventListener("focusin", (e) => {
-    const el = e.target, single = el.matches?.('.lib-tag-form input[name="tag"]'), multi = el.matches?.('[data-p2-form="library-field"][data-field="keywords"] textarea');
-    if (!(single || multi) || kwBound?.el === el || !a2.appView) return;
+    const el = e.target, single = el.matches?.('.lib-tag-form input[name="tag"]'), multi = el.matches?.('[data-p2-form="library-field"][data-field="keywords"] textarea'), type = el.matches?.('[data-p2-form="library-field"][data-field="type"] input');
+    if (!(single || multi || type) || kwBound?.el === el || !a2.appView) return;
     kwBound?.handle.destroy();
-    const token = single ? (inp) => inp.value.trim() ? { sign: "", query: inp.value, start: 0, end: inp.value.length } : null : (inp) => {
+    const token = type ? (inp) => ({ sign: "", query: inp.value, start: 0, end: inp.value.length }) : single ? (inp) => inp.value.trim() ? { sign: "", query: inp.value, start: 0, end: inp.value.length } : null : (inp) => {
       const v3 = inp.value, caret = inp.selectionStart ?? v3.length;
       let at2 = caret;
       while (at2 > 0 && !/[,，、;；\n]/.test(v3[at2 - 1])) at2--;
       const raw = v3.slice(at2, caret), lead = raw.length - raw.trimStart().length;
       return raw.trim() ? { sign: "", query: raw.trim(), start: at2 + lead, end: caret } : null;
     };
-    kwBound = { el, handle: bindSuggestPopup(a2.appView, el, { items: keywordItems, token, after: single ? "" : "、", manual: true }) };
+    kwBound = { el, handle: bindSuggestPopup(a2.appView, el, { items: type ? typeItems : keywordItems, token, after: single || type ? "" : "、", manual: true, pick: type ? () => setTimeout(() => finishField(el.closest('[data-p2-form="library-field"]')), 0) : void 0 }) };
+    if (type) kwBound.handle.update();
   });
   HOST.addEventListener("mousedown",e=>{if(e.target.closest?.("[data-lib-fmt]"))e.preventDefault();});
   HOST.addEventListener("click",e=>{
