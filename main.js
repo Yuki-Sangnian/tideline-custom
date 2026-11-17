@@ -10968,19 +10968,6 @@ ${item.conclusion}`)}</pre>` : ""}
     b3.textContent = foldLabel(open);
     b3.setAttribute("aria-expanded", String(open));
   });
-  // 书架页：右边一列（阅读进度、标签、读书笔记……）放不下时，把整排（左中右同高）往下加长，直到右列完整显示
-  // 以「一个标签、没有笔记和关联项目」的普通一本书为准（右列约 596px 高）：页面不够高就整页加长、可以上下滚动，
-  // 海底的风景留在加长后的页面最下面；比这更长的内容，右列和中间的详情照旧在框里自己滚动。
-  const SHELF_SIDE_REF = 596;
-  function fitShelf(root) {
-    if (!root.isConnected) return 0;
-    root.style.removeProperty("height");
-    const side = root.querySelector(".lib-shelf .lib-side");
-    if (!side) return 0;
-    const extra = Math.max(0, Math.ceil(SHELF_SIDE_REF - side.clientHeight));
-    if (extra > 1) root.style.height = root.clientHeight + extra + "px";
-    return extra;
-  }
   function paintReading(root) {
     readingComponent?.unload();
     readingComponent = null;
@@ -11044,9 +11031,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     return `<div class="lib-shelf">${B3("library-view", "sea", G3("left") + "<span>\u56DE\u5230\u6DF1\u6D77</span>", "\u56DE\u5230\u6DF1\u6D77\u89C6\u56FE", 'class="lib-back"')}${listPane()}${item ? recordPane(kind, item) + sidePane(kind, item) : `<section class="lib-record hand-panel"><p class="lib-none">${empty}</p></section>`}</div>`;
   }
   function render() {
-    const root = $5("#library");
-    root.style.removeProperty("height");
-    const w2 = root.clientWidth, h = root.clientHeight, mode2 = view();
+    const root = $5("#library"), w2 = root.clientWidth, h = root.clientHeight, mode2 = view();
     root.dataset.libraryView = mode2;
     root.classList.toggle("has-library-detail", mode2 === "sea" && !!d.ui.librarySelected);
     d.cache.libraryRendered = mode2 + w2 + "x" + h;
@@ -11055,10 +11040,6 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     if(editor)editor.dataset.initial=fieldSnapshot(editor);
     searchResults();
     paintReading(root);
-    const fitted = fitShelf(root);
-    setTimeout(() => {
-      if (fitShelf(root) !== fitted) a2.drawScenery?.();
-    }, 250);
   }
   // 笔记输入框下面的 B / I / 列表 / 链接：给选中的文字加格式（没选中就在光标处插入），光标和选区不会丢
   HOST.addEventListener("mousedown",e=>{if(e.target.closest?.("[data-lib-fmt]"))e.preventDefault();});
@@ -20241,10 +20222,6 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       box2.height = page.offsetTop + page.offsetHeight;
       box2.y = box2.top = sheet.getBoundingClientRect().top - sheet.scrollTop;
       box2.scroll = true;
-    }
-    if (box2 && this.page === "library") {
-      const page = this.root.querySelector("#library");
-      if (page) box2.height = Math.max(box2.height, page.offsetTop + page.offsetHeight);
     }
     const w2 = cached ? cached.w : box2.width, h = cached ? cached.h : Math.max(box2.height, 1);
     if (svg3.dataset.w !== String(w2) || svg3.dataset.h !== String(h)) {
