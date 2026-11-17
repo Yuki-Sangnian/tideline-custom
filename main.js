@@ -10853,7 +10853,7 @@ function libraryPage(a2) {
     return `<small class="lib-keyword-hint">用顿号、逗号、分号分隔；回车保存，Shift+回车换行</small><div class="lib-keyword-preview"><small>${words.length} 个关键词</small>${words.map(word=>`<span class="lib-chip">${esc2(word)}</span>`).join("")}</div>`;
   };
   function inlineField(field, value, html) {
-    if (d.ui.libraryEditing !== field) return B3("library-edit-field", field, html || esc2(value || "—"), "编辑" + field, 'class="lib-inline-value"');
+    if (d.ui.libraryEditing !== field) return B3("library-edit-field", field, html || esc2(value || "—"), "编辑" + ({ title: "标题" }[field] || field), 'class="lib-inline-value"');
     const sel=d.ui.librarySelected, item=find(sel.kind,sel.id), m=meta(sel.kind,item);
     let control;
     if(field==="projects") control=`<select name="value" multiple aria-label="关联项目">${d.projects.map(p=>`<option value="${esc2(p.id)}" ${item.projectIds.includes(p.id)?"selected":""}>${esc2(p.title)}</option>`).join("")}</select>`;
@@ -10871,7 +10871,7 @@ function libraryPage(a2) {
   function detail(kind, item) {
     const m2 = meta(kind, item), [, label, depth] = stageOf(kind, item.stage);
     return `<aside class="library-detail lib-card hand-panel"><div class="library-detail-actions">${B3("library-stage-menu", "", icon2("lead"), "\u66F4\u6539\u9605\u8BFB\u9636\u6BB5")}${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-close", "", svg3(ink2([[4, 4], [16, 16]], 1.3) + ink2([[16, 4], [4, 16]], 1.3)), "\u6298\u56DE\u7EB8\u7B7E")}</div>
- <div class="lib-kind">${icon2("note")}<span>${kind === "book" ? "\u4E66\u7C4D" : "\u6587\u732E"}</span></div><h3>${esc2(item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div>
+ <div class="lib-kind">${icon2("note")}<span>${kind === "book" ? "\u4E66\u7C4D" : "\u6587\u732E"}</span></div><h3>${inlineField("title", item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div>
  <h4>\u4E00\u53E5\u8BDD\u7ED3\u8BBA</h4><div class="lib-conclusion">${inlineField("conclusion",item.conclusion)}</div>
  <dl class="lib-facts"><div><dt>${G3("anchor")}<span>\u5173\u8054\u9879\u76EE</span></dt><dd>${inlineField("projects","",esc2(item.projectIds.map(id=>a2.project(id).title).join("、")||"未关联"))}</dd></div>
  <div><dt>${svg3(ink2([[3, 6], [17, 6]], 1) + ink2([[3, 10], [17, 10]], 1) + ink2([[3, 14], [11, 14]], 1))}<span>\u6240\u5728\u6DF1\u5EA6</span></dt><dd>${inlineField("stage",item.stage,esc2(label)+`<span class="mono">（${depth}）</span>`)}</dd></div>
@@ -10995,7 +10995,7 @@ ${item.conclusion}`)}</pre>` : ""}
     const m2 = meta(kind, item), sub = d.ui.librarySub || "abstract", links2 = item.projectIds.map((id) => a2.project(id));
     const entryLabel={abstract:"关键信息",note:"我的笔记",marks:"我的标注",related:"相关内容"}[sub]||"我的笔记";
     const body = sub === "abstract" ? `<h4>\u6458\u8981</h4>${readingBox("abstract", m2.abstract, item.id)}<h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li data-lib-pt="${i}">${[icon2("note"), G3("goal"), icon2("route")][i%3]}<div class="lib-point"><span class="lib-point-text"><b>${esc2(k2)}</b>${esc2(v2)}</span></div></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2, i3) => `<li>${readingBox("mark" + i3, x2, item.id)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes ? readingBox("related", m2.relatedNotes, item.id) : ""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`${m2.note ? readingBox("note", m2.note, item.id) : '<p class="lib-abstract"><span class="lib-none">还没有笔记。</span></p>'}`}`;
-    return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${esc2(item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>\u6253\u5F00 PDF</span>`, "\u6253\u5F00 PDF", 'class="lib-pdf"')}</div></header>
+    return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${inlineField("title", item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>\u6253\u5F00 PDF</span>`, "\u6253\u5F00 PDF", 'class="lib-pdf"')}</div></header>
  <div class="lib-tags">${m2.keywords.map((k2) => `<span class="lib-chip hand-pill">${esc2(k2)}</span>`).join("")}</div>
  <div class="lib-subtabs" role="tablist">${[["abstract", "\u6458\u8981"], ["note", "\u7B14\u8BB0"], ["marks", `\u6807\u6CE8 (${m2.marks.length})`], ["related", `\u76F8\u5173 (${related(kind, item).length+(m2.relatedNotes||"").split(/\n+/).filter(Boolean).length})`]].map(([k2, l2]) => B3("library-sub", k2, l2, l2, `role="tab" aria-selected="${sub === k2}"`)).join("")}</div>
  <div class="lib-record-body">${body}${d.ui.librarySource ? `<pre class="markdown-preview">${esc2(`---
@@ -11185,7 +11185,15 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     if (f.dataset.p2Form === "library-field" && sel) {
       const item=find(sel.kind,sel.id), m=meta(sel.kind,item), field=f.dataset.field, value=f.elements.value?.value.trim()||"";
       if(field==="projects") item.projectIds=Array.from(f.elements.value.selectedOptions,o=>o.value);
-      else if(field==="conclusion") item.conclusion=value;
+      else if(field==="title") {
+        const name = value.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim(), box = f.elements.value;
+        if (!name) { box.setCustomValidity("请输入标题");box.reportValidity();return true; }
+        if (name !== item.title) {
+          if (item.source === "zotero") { box.setCustomValidity("这条来自 Zotero，标题请在 Zotero 里改");box.reportValidity();return true; }
+          if ((sel.kind === "book" ? d.books : d.literature).some((x2) => x2 !== item && x2.title === name)) { box.setCustomValidity("已有同名条目，请换个标题");box.reportValidity();return true; }
+          item.title = name;
+        }
+      } else if(field==="conclusion") item.conclusion=value;
       else if(field==="stage") { item.stage=value; if(["done","deep-done"].includes(value)) item.readDate=d.clock.date; }
       else if(field==="keywords") m.keywords=parseLibraryKeywords(value);
       else if(field==="progress") {
@@ -12890,6 +12898,13 @@ function renameRefs(d, from, to) {
   for (const [k2, v2] of Object.entries(d.ui)) {
     if (v2 === from) d.ui[k2] = to;
     else if (v2 && typeof v2 === "object" && v2.id === from) v2.id = to;
+  }
+  for (const kind of ["literature", "book"]) {
+    const a2 = kind + "|" + from;
+    if (d.libraryMeta && a2 in d.libraryMeta) {
+      d.libraryMeta[kind + "|" + to] = d.libraryMeta[a2];
+      delete d.libraryMeta[a2];
+    }
   }
   for (const arr of [d.tasks, d.projects]) for (const x2 of arr || []) for (const key of ["projectId", "parentId", "peopleIds", "goalIds", "ideaIds", "literatureIds"]) {
     if (x2[key] === from) x2[key] = to;

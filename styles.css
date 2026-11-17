@@ -4106,3 +4106,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .idea-card .idea-detail{padding-top:4px}
 .compass-root .idea-card .idea-excerpt{margin-top:4px}
 .compass-root .idea-card .idea-reading > :first-child{margin-top:4px!important}
+
+/* 知识库详情的标题：点一下就能改名（书籍、文献都一样） */
+.compass-root #library :is(.lib-card,.lib-record) h3 .lib-inline-value{cursor:text;text-align:left;display:inline;font:inherit}
+.compass-root #library :is(.lib-card,.lib-record) h3 .lib-inline-value:is(:hover,:focus-visible){text-decoration:underline dotted;text-underline-offset:5px;outline:none}
+.compass-root #library :is(.lib-card,.lib-record) h3 .lib-inline-editor{margin:0}
