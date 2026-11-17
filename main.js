@@ -5666,7 +5666,7 @@ ${line}
       await plugin.writer.create(path, "---\n---\n\n## 摘要\n\n## 要点\n\n## 摘录\n\n## 笔记\n");
       await plugin.writer.frontmatter(path, fm => {
         fm.authors = "";
-        fm.type = isBook ? "专著" : "论文";
+        if (!isBook) fm.type = "论文";
         fm.stage = isBook ? "reading" : "inbox";
         fm.added = date2;
         if (isBook) fm.started = date2;
