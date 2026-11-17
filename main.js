@@ -10832,6 +10832,12 @@ ${d.review.wheel.map((r) => r.title + ": " + (r.value ?? "")).join("\n")}`)}</pr
 function libraryPage(a2) {
   const { d, $: $5, ink: ink2, circle: circle2, icon: icon2, esc: esc2, svg: svg3, button: B3, glyph: G3, fmt } = a2, P3 = a2.PAPER, M2 = a2.SECONDARY, T3 = a2.TICK, I2 = a2.INK;
   // 日期：不是今年的要带上年份（比如 2025年4月21日），今年的只写月日
+  // 纸签上的读完日期：往年的挂在年份小绳结下面，年份已经写在小绳结上，所以只写月日；今年的也只写月日
+  const cardDate = (it) => {
+    if (!it.readDate || !["deep-done", "done"].includes(it.stage)) return "";
+    const m3 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(it.readDate));
+    return m3 ? `${+m3[2]}月${+m3[3]}日` : fmtDay(it.readDate);
+  };
   const fmtDay = (v2) => v2 && /^\d{4}-\d{2}-\d{2}/.test(String(v2)) ? dayText(String(v2).slice(0, 10), d.clock.date) : fmt(v2);
   const stages = { literature: [["inbox", "\u5F85\u6CDB\u8BFB", "0 \u2013 200 m"], ["skimmed", "\u5DF2\u6CDB\u8BFB", "200 \u2013 1,000 m"], ["to-deep", "\u5F85\u7CBE\u8BFB", "1,000 \u2013 3,000 m"], ["deep-done", "\u5DF2\u7CBE\u8BFB", "3,000 m +"]], book: [["want", "\u60F3\u8BFB", "0 \u2013 500 m"], ["reading", "\u5728\u8BFB", "500 \u2013 2,000 m"], ["done", "\u8BFB\u5B8C", "2,000 m +"]] };
   const records = (kind) => kind === "book" ? d.books : d.literature, find = (kind, id) => records(kind).find((x2) => x2.id === id), stageOf = (kind, s) => stages[kind].find((x2) => x2[0] === s) || ["dropped", "\u653E\u5F03", "\u6C89\u5E95"];
@@ -11005,10 +11011,11 @@ function libraryPage(a2) {
         return Math.ceil(16 + w3 + (it.projectIds.length ? 34 : 12) + (kind === "book" && noteLinks(kind, it).length ? 24 : 0) + 6);
       };
       const dateW = (it) => {
-        if (!it.readDate || !["deep-done", "done"].includes(it.stage)) return 0;
+        const text = cardDate(it);
+        if (!text) return 0;
         let w3 = 0;
-        for (const ch2 of fmtDay(it.readDate)) w3 += ch2.charCodeAt(0) > 255 ? 10.5 : 6.4;
-        return Math.ceil(16 + w3 + 12);
+        for (const ch2 of text) w3 += ch2.charCodeAt(0) > 255 ? 13 : 8;
+        return Math.ceil(16 + w3 + 14);
       };
       const wOf = (it) => Math.min(avail, Math.max(96, titleW(it), dateW(it)));
       // 一行排不下就换到下一行
@@ -11158,7 +11165,7 @@ function libraryPage(a2) {
   }
   function tag(c, cls = "") {
     const { kind, item } = c, active = !d.ui.libraryFilter || item.projectIds.includes(d.ui.libraryFilter), sel = d.ui.librarySelected?.id === item.id, linked = item.projectIds.length, done2 = ["deep-done", "done"].includes(item.stage);
-    return `<div class="library-sign lib-tag hand-panel ${cls} ${linked ? "" : "unlinked"} ${active ? "" : "unrelated"} ${matches(kind, item) ? "" : "is-unmatched"} ${sel ? "is-selected" : ""}" draggable="true" data-p2-drag="paper" data-id="${kind}|${item.id}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px${c.rot ? `;transform:rotate(${c.rot}deg)` : ""}">${B3("library-open", kind + "|" + item.id, `<span>${esc2(item.title)}</span>${done2 && item.readDate ? `<time class="mono">${fmtDay(item.readDate)}</time>` : ""}`, "\u6253\u5F00 " + item.title, `class="paper-title" data-paper-hover="${kind}|${item.id}" aria-describedby="library-gloss"`)}${linked ? B3("library-project-filter", item.projectIds[0], G3("anchor"), "\u7B5B\u9009\u9879\u76EE " + a2.project(item.projectIds[0]).title, 'class="paper-project-mark"') : ""}${kind === "book" && noteLinks(kind, item).length ? B3("library-notes-show", item.id, notesOpenMap()[item.id] ? "▾" : "▸", (notesOpenMap()[item.id] ? "隐藏" : "显示") + "读书笔记", `class="lib-notes-arrow" aria-expanded="${!!notesOpenMap()[item.id]}"`) : ""}</div>`;
+    return `<div class="library-sign lib-tag hand-panel ${cls} ${linked ? "" : "unlinked"} ${active ? "" : "unrelated"} ${matches(kind, item) ? "" : "is-unmatched"} ${sel ? "is-selected" : ""}" draggable="true" data-p2-drag="paper" data-id="${kind}|${item.id}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px${c.rot ? `;transform:rotate(${c.rot}deg)` : ""}">${B3("library-open", kind + "|" + item.id, `<span>${esc2(item.title)}</span>${cardDate(item) ? `<time class="mono">${cardDate(item)}</time>` : ""}`, "\u6253\u5F00 " + item.title, `class="paper-title" data-paper-hover="${kind}|${item.id}" aria-describedby="library-gloss"`)}${linked ? B3("library-project-filter", item.projectIds[0], G3("anchor"), "\u7B5B\u9009\u9879\u76EE " + a2.project(item.projectIds[0]).title, 'class="paper-project-mark"') : ""}${kind === "book" && noteLinks(kind, item).length ? B3("library-notes-show", item.id, notesOpenMap()[item.id] ? "▾" : "▸", (notesOpenMap()[item.id] ? "隐藏" : "显示") + "读书笔记", `class="lib-notes-arrow" aria-expanded="${!!notesOpenMap()[item.id]}"`) : ""}</div>`;
   }
   function toolbar() {
     const f = d.ui.libraryFilter;
