@@ -4951,13 +4951,19 @@ var stamp2 = (v2) => v2 instanceof Date ? v2.toISOString().slice(0, 16).replace(
 var list = (v2) => (Array.isArray(v2) ? v2 : v2 === void 0 || v2 === null || v2 === "" ? [] : [v2]).map(String);
 function section(text, title) {
   const lines2 = bodyOf(text).split("\n"), out = [];
-  let on = false;
+  let on = false, cont = false;
   for (const l2 of lines2) {
     if (/^##\s/.test(l2)) {
       on = l2.replace(/^##\s+/, "").trim() === title;
+      cont = false;
       continue;
     }
-    if (on && /^\s*-\s+/.test(l2)) out.push(l2.replace(/^\s*-\s+/, "").trim());
+    if (!on) continue;
+    if (/^\s*-\s+/.test(l2)) {
+      out.push(l2.replace(/^\s*-\s+/, "").trim());
+      cont = true;
+    } else if (cont && /^\s+\S/.test(l2)) out[out.length - 1] += "\n" + l2.trim(); // 缩进的续行：同一条里的换行
+    else cont = false;
   }
   return out;
 }
@@ -11700,9 +11706,11 @@ ${item.conclusion}`)}</pre>` : ""}</div>
       if (!added) return true;
       const saved = meta(sel.kind, find(sel.kind, sel.id));
       const section=f.dataset.librarySection||"note";
-      if(section==="marks")saved.marks=[...(saved.marks||[]),...added.split(/\n+/).filter(Boolean)];
+      // 一次写的是一条：Shift+回车换的行留在这一条里，不拆成好几条
+      const one = added.split("\n").map(l3 => l3.trimEnd()).join("\n").replace(/\n{2,}/g, "\n");
+      if(section==="marks")saved.marks=[...(saved.marks||[]),one];
       else if(section==="related")saved.relatedNotes=[saved.relatedNotes?.trim(),added].filter(Boolean).join("\n\n");
-      else if(section==="abstract")saved.points=[...(saved.points||[]),...added.split(/\n+/).filter(Boolean).map(line=>{const at=line.search(/[：:]/);return at>0?[line.slice(0,at).trim(),line.slice(at+1).trim()]:["",line];})];
+      else if(section==="abstract"){const first=one.split("\n")[0],at=first.search(/[：:]/);saved.points=[...(saved.points||[]),at>0?[first.slice(0,at).trim(),(first.slice(at+1)+one.slice(first.length)).trim()]:["",one]];}
       else saved.note=[saved.note?.trim(),added].filter(Boolean).join("\n\n");
       f.elements.note.value="";
       d.ui.librarySub=section;
@@ -13229,7 +13237,7 @@ function libFm(d, kind, x2, links2) {
 }
 function libBody(d, kind, x2) {
   const m2 = d.libraryMeta?.[kind + "|" + x2.id] || {};
-  return { lead:x2.conclusion||"",sections:{"笔记":m2.note||"","摘要":m2.abstract||"","要点":(m2.points||[]).map(([label,text])=>"- "+(label?label+"：":"")+text).join("\n"),"摘录":(m2.marks||[]).map(text=>"- "+text).join("\n"),"相关":m2.relatedNotes||""}};
+  return { lead:x2.conclusion||"",sections:{"笔记":m2.note||"","摘要":m2.abstract||"","要点":(m2.points||[]).map(([label,text])=>"- "+(label?label+"：":"")+String(text).replace(/\n/g,"\n  ")).join("\n"),"摘录":(m2.marks||[]).map(text=>"- "+String(text).replace(/\n/g,"\n  ")).join("\n"),"相关":m2.relatedNotes||""}};
 }
 var snap = (v2) => JSON.stringify(v2);
 function createPersist(writer) {
