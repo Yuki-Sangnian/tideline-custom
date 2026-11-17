@@ -11182,10 +11182,10 @@ function libraryPage(a2) {
         let rows;
         if (kind === "book" && s === "reading") {
           items = items.slice().sort((a3, b3) => pct(kind, a3) - pct(kind, b3));
-          // 进度一样的横着排在一行里，进度小的在上
+          // 进度的十位数一样的横着排在一行里（0–9% 一行、10–19% 一行……），进度小的在上
           const byProgress = new Map();
           for (const it of items) {
-            const p3 = pct(kind, it);
+            const p3 = Math.min(10, Math.floor(pct(kind, it) / 10));
             if (!byProgress.has(p3)) byProgress.set(p3, []);
             byProgress.get(p3).push(it);
           }
