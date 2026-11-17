@@ -10738,10 +10738,39 @@ ${item.conclusion}`)}</pre>` : ""}
  <label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6807\u9898\u3001\u4F5C\u8005\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>
  <div class="lib-groups">${groups.map(([label, items]) => `<div class="lib-group ${shut[label] ? "is-shut" : ""}">${B3("library-group", label, `${svg3(ink2(shut[label] ? [[7, 4], [13, 10], [7, 16]] : [[4, 7], [10, 13], [16, 7]], 1.3))}<b>${label}</b><span class="mono">${items.length}</span>`, label)}<ul>${items.map(([k2, x2]) => listRow(k2, x2)).join("")}</ul></div>`).join("")}</div></section>`;
   }
+  // 知识库详情里摘要、笔记、标注、相关四块文字用「阅读模式」显示：按 Markdown 渲染，段落、列表、引用、链接都正常，不再挤成一团
+  const mdStore = new Map();
+  let readingComponent = null;
+  function readingBox(key, text, source) {
+    mdStore.set(key, String(text || ""));
+    return `<div class="lib-abstract lib-reading markdown-rendered" data-lib-md="${key}" data-lib-source="${esc2(source || "")}"></div>`;
+  }
+  function paintReading(root) {
+    readingComponent?.unload();
+    readingComponent = null;
+    const targets = [...root.querySelectorAll("[data-lib-md]")];
+    if (!targets.length) return;
+    const app = window.app, component = readingComponent = new import_obsidian7.Component();
+    component.load();
+    for (const el of targets) {
+      const markdown = mdStore.get(el.dataset.libMd) || "", source = el.dataset.libSource || "";
+      el.addEventListener("click", (e) => {
+        const link = e.target.closest("a.internal-link");
+        if (!link) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        app.workspace.openLinkText(link.dataset.href || link.getAttribute("href"), source, e.metaKey || e.ctrlKey);
+      }, { capture: true });
+      import_obsidian7.MarkdownRenderer.render(app, markdown, el, source, component).catch((error) => {
+        if (el.isConnected) el.textContent = markdown;
+        console.error("Tideline library reading", error);
+      });
+    }
+  }
   function recordPane(kind, item) {
     const m2 = meta(kind, item), sub = d.ui.librarySub || "abstract", links2 = item.projectIds.map((id) => a2.project(id));
     const entryLabel={abstract:"关键信息",note:"我的笔记",marks:"我的标注",related:"相关内容"}[sub]||"我的笔记";
-    const body = sub === "abstract" ? `<h4>\u6458\u8981</h4><p class="lib-abstract">${esc2(m2.abstract)}</p><h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li>${[icon2("note"), G3("goal"), icon2("route")][i%3]}<span><b>${esc2(k2)}</b>${esc2(v2)}</span></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2) => `<li>${esc2(x2)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes?`<div class="lib-abstract">${noteText(m2.relatedNotes,item.id)}</div>`:""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`<p class="lib-abstract">${m2.note ? noteText(m2.note, item.id) : '<span class="lib-none">还没有笔记。</span>'}</p>`}`;
+    const body = sub === "abstract" ? `<h4>\u6458\u8981</h4>${readingBox("abstract", m2.abstract, item.id)}<h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li>${[icon2("note"), G3("goal"), icon2("route")][i%3]}<span><b>${esc2(k2)}</b>${esc2(v2)}</span></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2, i3) => `<li>${readingBox("mark" + i3, x2, item.id)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes ? readingBox("related", m2.relatedNotes, item.id) : ""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`${m2.note ? readingBox("note", m2.note, item.id) : '<p class="lib-abstract"><span class="lib-none">还没有笔记。</span></p>'}`}`;
     return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${esc2(item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>\u6253\u5F00 PDF</span>`, "\u6253\u5F00 PDF", 'class="lib-pdf"')}</div></header>
  <div class="lib-tags">${m2.keywords.map((k2) => `<span class="lib-chip hand-pill">${esc2(k2)}</span>`).join("")}</div>
  <div class="lib-subtabs" role="tablist">${[["abstract", "\u6458\u8981"], ["note", "\u7B14\u8BB0"], ["marks", `\u6807\u6CE8 (${m2.marks.length})`], ["related", `\u76F8\u5173 (${related(kind, item).length+(m2.relatedNotes||"").split(/\n+/).filter(Boolean).length})`]].map(([k2, l2]) => B3("library-sub", k2, l2, l2, `role="tab" aria-selected="${sub === k2}"`)).join("")}</div>
@@ -10786,6 +10815,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     const editor=$5('[data-p2-form="library-field"]');
     if(editor)editor.dataset.initial=fieldSnapshot(editor);
     searchResults();
+    paintReading(root);
   }
   HOST.addEventListener("keydown",e=>{
     if(!e.target.matches?.("[data-library-query]")||e.isComposing||e.keyCode===229)return;

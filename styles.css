@@ -4047,3 +4047,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root button.focus-section-pick{background:none;border:0;padding:0;box-shadow:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .compass-root button.focus-section-pick:is(:hover,:focus-visible) > span{text-decoration:underline;text-underline-offset:4px;outline:none}
 .compass-root .focus-picker{margin:0 0 14px}
+/* 知识库详情的摘要、笔记、标注、相关：阅读模式 */
+.compass-root .lib-reading{background:none;padding:0;color:var(--ink);font-size:13.5px;line-height:1.8}
+.compass-root .lib-reading > :first-child{margin-top:0}
+.compass-root .lib-reading > :last-child{margin-bottom:0}
+.compass-root .lib-reading p{margin:0 0 .7em}
+.compass-root .lib-reading :is(ul,ol){margin:0 0 .7em;padding-left:1.4em}
+.compass-root .lib-reading li{margin:.15em 0}
+.compass-root .lib-reading blockquote{margin:.4em 0 .7em;padding:0 0 0 12px;border-left:2px solid var(--tick);color:var(--secondary)}
+.compass-root .lib-reading :is(h1,h2,h3,h4){margin:.8em 0 .4em;font-size:1em;font-weight:600}
+.compass-root .lib-reading a{color:var(--now);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.compass-root .lib-marks li > .lib-reading{font-size:13px}
