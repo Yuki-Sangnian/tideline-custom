@@ -5667,9 +5667,8 @@ ${line}
       await plugin.writer.frontmatter(path, fm => {
         fm.authors = "";
         if (!isBook) fm.type = "论文";
-        fm.stage = isBook ? "reading" : "inbox";
+        fm.stage = isBook ? "want" : "inbox";
         fm.added = date2;
-        if (isBook) fm.started = date2;
         fm.currentPage = 0;
         fm.totalPages = null;
         fm.keywords = [...new Set((text.match(/#[^\s#]+/g) || []).map(t => t.slice(1)))];

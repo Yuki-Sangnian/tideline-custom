@@ -4063,3 +4063,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .lib-note-bar .lib-fmt:is(:hover,:focus-visible){color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);outline:none}
 .compass-root .lib-note-bar .lib-fmt[data-lib-fmt="b"]{font-weight:700}
 .compass-root .lib-note-bar .lib-fmt[data-lib-fmt="i"]{font-style:italic}
+/* 知识库详情阅读模式里的标题：最大的一级标题也不超过文件标题（22px），逐级变小 */
+.compass-root .lib-record .lib-reading :is(h1,h2,h3,h4,h5,h6){margin:.9em 0 .4em!important;line-height:1.4!important;font-weight:600!important;font-family:var(--serif)!important}
+.compass-root .lib-record .lib-reading h1{font-size:20px!important}
+.compass-root .lib-record .lib-reading h2{font-size:18px!important}
+.compass-root .lib-record .lib-reading h3{font-size:16.5px!important}
+.compass-root .lib-record .lib-reading :is(h4,h5,h6){font-size:15px!important}
+.compass-root .lib-record .lib-reading :is(h1,h2,h3,h4,h5,h6):first-child{margin-top:0!important}
