@@ -6290,7 +6290,10 @@ function createToday({ root, art, ui }) {
         return heading + `<div class="temporary-menu" role="group" aria-label="\u6311\u9009\u4ECA\u65E5\u91CD\u70B9">${choices.join("") || "<span>\u4ECA\u5929\u6CA1\u6709\u53EF\u9009\u7684\u4EFB\u52A1</span>"}<button data-action="cancel-focus">\u6536\u8D77</button></div>`;
       }
       const s = v2.stats;
-      return mark("anchor", "\u4ECA\u65E5\u805A\u7126", "focus-section-mark") + `<div class="focus-primary"><div><button class="focus-name" data-detail="${esc(first.id)}">${esc(first.title)}</button><div class="focus-project">${esc(first.project || "")}</div></div><button class="outline complete" data-complete="${esc(first.id)}" aria-label="\u5B8C\u6210\uFF1A${esc(first.title)}">\u5B8C\u6210</button></div><div class="focus-rest">${v2.focus.slice(1).map((t) => `<div><div class="focus-secondary">${smallCheck(t.id, t.title)}<button data-detail="${esc(t.id)}">${esc(t.title)}</button></div></div>`).join("")}</div>` + (open ? "" : `<div class="today-stats">${s.milestone ? `<span class="ts-station">${icon("route", 16)}\u91CC\u7A0B\u7891 <b>${esc(s.milestone.title)}</b><i class="mono">${s.milestone.n} / ${s.milestone.of}</i></span>` : ""}<span>\u5B8C\u6210 <b class="mono">${s.done} / ${s.total}</b></span><span>\u6295\u5165 <b class="mono">${formatEffortHours(s.hours)}h</b></span><span>\u4E60\u60EF <b class="mono">${s.habits} / ${s.habitTotal}</b></span>${s.next ? `<span>\u4E0B\u4E00\u9879 <b class="mono">${s.next.time}</b> ${esc(s.next.title)}</span>` : ""}</div>`);
+      // 点「今日聚焦」这四个字，列出其他任务，换一个作今天的聚焦
+      const pickHead = `<button type="button" class="today-section-mark focus-section-mark focus-section-pick" data-action="${ui.chooseFocus ? "cancel-focus" : "choose-focus"}" aria-expanded="${!!ui.chooseFocus}" aria-label="更换今日聚焦" title="点击更换今日聚焦">${icon("anchor")}<span>今日聚焦</span></button>`;
+      const pickMenu = ui.chooseFocus ? `<div class="temporary-menu focus-picker" role="group" aria-label="更换今日聚焦">${v2.other.filter((t) => t.id !== first.id).map((t) => `<button data-focus="${esc(t.id)}">${esc(t.title)}</button>`).join("") || "<span>没有别的可选任务</span>"}<button data-action="cancel-focus">收起</button></div>` : "";
+      return pickHead + pickMenu + `<div class="focus-primary"><div><button class="focus-name" data-detail="${esc(first.id)}">${esc(first.title)}</button><div class="focus-project">${esc(first.project || "")}</div></div><button class="outline complete" data-complete="${esc(first.id)}" aria-label="\u5B8C\u6210\uFF1A${esc(first.title)}">\u5B8C\u6210</button></div><div class="focus-rest">${v2.focus.slice(1).map((t) => `<div><div class="focus-secondary">${smallCheck(t.id, t.title)}<button data-detail="${esc(t.id)}">${esc(t.title)}</button></div></div>`).join("")}</div>` + (open ? "" : `<div class="today-stats">${s.milestone ? `<span class="ts-station">${icon("route", 16)}\u91CC\u7A0B\u7891 <b>${esc(s.milestone.title)}</b><i class="mono">${s.milestone.n} / ${s.milestone.of}</i></span>` : ""}<span>\u5B8C\u6210 <b class="mono">${s.done} / ${s.total}</b></span><span>\u6295\u5165 <b class="mono">${formatEffortHours(s.hours)}h</b></span><span>\u4E60\u60EF <b class="mono">${s.habits} / ${s.habitTotal}</b></span>${s.next ? `<span>\u4E0B\u4E00\u9879 <b class="mono">${s.next.time}</b> ${esc(s.next.title)}</span>` : ""}</div>`);
     });
     put("other", [v2.other, v2.allDone, open, v2.date], $5("#other-tasks"), () => {
       if (v2.allDone) return "";
@@ -6693,17 +6696,32 @@ var dayPath = (date2) => `${FOLDERS.journal}/${date2}.md`;
 function todayActions(writer, clock) {
   return {
     // 完成 / 重新打开任务不在这里：和任务页共用 data/complete.js，经 view.toggleTask 走 persist.js 写回（P1-2）
-    async chooseFocus(task) {
+    // 选一个任务作今日聚焦；previous 是之前带着聚焦标记的任务，先给新任务标上，再把旧的标记去掉（反过来会有一瞬间没有聚焦，被自动补成别的），撤销时都还原
+    async chooseFocus(task, previous = []) {
       let before2;
       await writer.frontmatter(task.path, (fm) => {
         before2 = fm.focus;
         fm.focus = 1;
       });
-      return () => writer.frontmatter(task.path, (fm) => {
-        if (fm.focus !== 1) return;
-        if (before2 === void 0) delete fm.focus;
-        else fm.focus = before2;
-      });
+      const cleared = [];
+      for (const old of previous) {
+        if (!old.path || old.id === task.id) continue;
+        await writer.frontmatter(old.path, (fm) => {
+          if (fm.focus === void 0) return;
+          cleared.push([old, fm.focus]);
+          delete fm.focus;
+        });
+      }
+      return async () => {
+        await writer.frontmatter(task.path, (fm) => {
+          if (fm.focus !== 1) return;
+          if (before2 === void 0) delete fm.focus;
+          else fm.focus = before2;
+        });
+        for (const [old, value] of cleared) await writer.frontmatter(old.path, (fm) => {
+          fm.focus = value;
+        });
+      };
     },
     // 习惯三态：没记 → 完成 → 没完成 → 没记（和原型一样点一下换一态）
     async cycleHabit(id) {
@@ -20100,9 +20118,10 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       return;
     }
     if (d.focus) {
-      const task = this.view.other.find((t) => t.id === d.focus && t.date === this.view.date);
+      const task = this.view.other.find((t) => t.id === d.focus);
       if (!task) return;
-      const undo = await this.actions.chooseFocus(task);
+      const previous = [...this.plugin.index.tasks.values()].filter((t) => t.focus && t.id !== task.id);
+      const undo = await this.actions.chooseFocus(task, previous);
       this.ui.chooseFocus = false;
       this.frame.feedback(task.title, undo);
       return;

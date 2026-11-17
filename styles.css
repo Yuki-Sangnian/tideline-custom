@@ -4043,3 +4043,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #library .lib-project-chip svg:not(.hand-popup-frame){width:16px!important;height:16px!important;flex:none}
 .compass-root #library .lib-project-chip i{font-style:normal;color:var(--secondary)}
 .compass-root #library .lib-project-chip:is(:hover,:focus-visible) i{color:var(--ink)}
+/* 今日聚焦：点标题换聚焦的任务 */
+.compass-root button.focus-section-pick{background:none;border:0;padding:0;box-shadow:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.compass-root button.focus-section-pick:is(:hover,:focus-visible) > span{text-decoration:underline;text-underline-offset:4px;outline:none}
+.compass-root .focus-picker{margin:0 0 14px}
