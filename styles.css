@@ -4073,3 +4073,23 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 /* 今日页「想到了什么？」输入行：固定在右下角，不随页面上下滚动（位置和宽度由脚本对齐右边那一列） */
 .compass-root #today #journal-form{position:fixed;z-index:20;bottom:14px;margin:0;padding:6px 0 4px;background:var(--paper);box-sizing:border-box}
 .compass-root #today .today-subsection[data-today-group="journal"]{padding-bottom:52px}
+
+/* 页面里所有渲染出来的 Markdown 标题（想法正文、知识库阅读）：最大的一级标题也不超过页面标题，逐级变小 */
+.compass-root .markdown-rendered :is(h1,h2,h3,h4,h5,h6){margin:.9em 0 .4em!important;line-height:1.4!important;font-weight:600!important;font-family:var(--serif)!important}
+.compass-root .markdown-rendered h1{font-size:20px!important}
+.compass-root .markdown-rendered h2{font-size:18px!important}
+.compass-root .markdown-rendered h3{font-size:16.5px!important}
+.compass-root .markdown-rendered :is(h4,h5,h6){font-size:15px!important}
+
+/* 知识库摘要只显示第一段、关键信息每条最多两行，没显示完的有「展开 / 收起」 */
+.compass-root .lib-reading:not(.is-open) > .lib-fold-hide{display:none}
+.compass-root .lib-points .lib-point{flex:1;min-width:0}
+.compass-root .lib-points .lib-point-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.compass-root .lib-points li.is-open .lib-point-text{display:block;-webkit-line-clamp:unset;overflow:visible}
+.compass-root .lib-fold-toggle{display:block;margin:2px 0 0;padding:2px 0;border:0;background:none;box-shadow:none;font-size:12px;line-height:1.5;color:var(--secondary);cursor:pointer}
+.compass-root .lib-fold-toggle:is(:hover,:focus-visible){color:var(--ink);outline:none}
+
+/* 输入 # / @ 时弹出的已有标签 / 人物列表（记录框、想法输入框） */
+.compass-root .tl-suggest{position:fixed;z-index:200;width:230px;max-height:260px;overflow-y:auto;padding:8px 10px;box-sizing:border-box;scrollbar-width:thin}
+.compass-root .tl-suggest button{display:block;width:100%;padding:5px 6px;border:0;background:none;box-shadow:none;text-align:left;font:inherit;font-size:14px;line-height:1.45;color:var(--ink);cursor:pointer}
+.compass-root .tl-suggest button[aria-selected="true"]{background:color-mix(in srgb,var(--ink) 7%,transparent);font-weight:600}

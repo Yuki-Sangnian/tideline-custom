@@ -2984,6 +2984,25 @@ function createThought({ core, r12Art, r14Marine, view }) {
         break;
     }
   });
+  // 想法输入框：敲 # 列出已有的想法标签，敲 @ 列出人物；不选就按输入的内容新建
+  let ideaSuggestEl = null;
+  HOST.addEventListener("focusin", (e) => {
+    if (e.target.id !== "idea-input" || ideaSuggestEl === e.target) return;
+    ideaSuggestEl = e.target;
+    bindSuggestPopup(view, e.target, {
+      items: (token) => {
+        if (token.sign === "@") {
+          const ix = view.plugin?.index;
+          return ix ? suggestions(token, { lists: [], projects: [], people: [...ix.people.values()], tasks: [] }).filter((s) => !s.create) : [];
+        }
+        if (token.sign !== "#") return [];
+        const stats = new Map();
+        for (const idea of d.ideas) for (const t of tagsOf(idea)) stats.set(t, (stats.get(t) || 0) + 1);
+        for (const t of ideaTagNames()) if (!stats.has(t)) stats.set(t, 0);
+        return tagItems(stats, token.query);
+      }
+    });
+  });
   HOST.addEventListener("submit", (e) => {
     if (e.target.id === "tag-inline-form") {
       e.preventDefault();
@@ -2998,9 +3017,18 @@ function createThought({ core, r12Art, r14Marine, view }) {
         return;
       }
       const tags = [...d.ui.draftTags];
+      let body = text;
+      const typed = [...text.matchAll(/(?:^|\s)#([^\s#@]+)/g)].map((m2) => cleanTag(m2[1])).filter(Boolean);
+      if (typed.length) {
+        const rest = text.replace(/(^|\s)#[^\s#@]+/g, "$1").replace(/[ \t]+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
+        if (rest) {
+          body = rest;
+          for (const t of typed) if (!tags.includes(t)) tags.push(t);
+        }
+      }
       d.ui.draftTags = [];
       closeTagPanels();
-      captureIdea(text, tags);
+      captureIdea(body, tags);
       $5("#idea-input").value = "";
       $5("#idea-input").focus();
       d.cache.ideaDraft = "";
@@ -5448,6 +5476,126 @@ function suggestions(token, d) {
   return all;
 }
 
+// 输入框里敲 # 或 @ 时弹出已有的标签 / 人物：上下键选、回车或点击插入；不选就照输入的内容新建
+function tagItems(stats, q2) {
+  const low = (q2 || "").toLowerCase(), all = [...stats].filter(([t]) => t && !/\s/.test(t) && (!low || t.toLowerCase().includes(low)));
+  all.sort((a2, b3) => (b3[0] === q2) - (a2[0] === q2) || b3[1] - a2[1] || a2[0].localeCompare(b3[0], "zh-Hans-u-co-pinyin"));
+  const out = all.slice(0, 12).map(([t, n]) => ({ insert: "#" + t, label: "标签 · " + t + (n ? " (" + n + ")" : "") }));
+  if (q2 && !stats.has(q2)) out.push({ insert: "#" + q2, label: "新建标签 · " + q2 });
+  return out;
+}
+function bindSuggestPopup(view, input, { items, pick }) {
+  let st = null, box = null, ime = false;
+  const close = () => {
+    st = null;
+    box?.remove();
+    box = null;
+    input.removeAttribute("aria-activedescendant");
+  };
+  const place = () => {
+    box.style.left = "0px";
+    box.style.top = "0px";
+    box.style.maxHeight = "";
+    const o = box.getBoundingClientRect(), r = input.getBoundingClientRect();
+    const below = innerHeight - r.bottom - 12, above = r.top - 12;
+    const down = below >= Math.min(box.scrollHeight, 220) || below >= above;
+    const room = Math.max(100, Math.min(260, down ? below : above));
+    box.style.maxHeight = room + "px";
+    const h = Math.min(box.offsetHeight, room), w = box.offsetWidth;
+    const x = Math.max(8, Math.min(r.left + 8, innerWidth - w - 8)), y = down ? r.bottom + 4 : r.top - 4 - h;
+    box.style.left = x - o.left + "px";
+    box.style.top = y - o.top + "px";
+  };
+  const paint = () => {
+    if (!st) return;
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "tl-suggest hand-popup";
+      box.setAttribute("role", "listbox");
+      view.root.append(box);
+    }
+    const frame = box.querySelector(":scope > .hand-popup-frame");
+    box.innerHTML = st.items.map((s, i) => `<button type="button" role="option" id="tl-suggest-${i}" data-tl-pick="${i}" aria-selected="${i === st.index}">${esc(s.label)}</button>`).join("");
+    if (frame) box.prepend(frame);
+    input.setAttribute("aria-activedescendant", "tl-suggest-" + st.index);
+    place();
+    view.frames();
+    box.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+  };
+  const update = () => {
+    if (ime) return;
+    const token = activeToken(input.value, input.selectionStart ?? input.value.length), list2 = token ? items(token) || [] : [];
+    if (!list2.length) {
+      close();
+      return;
+    }
+    const same = st && st.token.sign === token.sign && st.token.query === token.query;
+    st = { token, items: list2, index: same ? Math.min(st.index, list2.length - 1) : 0 };
+    paint();
+  };
+  const choose = (i) => {
+    const s = st?.items[i];
+    if (!s) return;
+    const { token } = st, v2 = input.value, ins = s.insert + " ";
+    input.value = v2.slice(0, token.start) + ins + v2.slice(token.end).replace(/^[ \t]+/, "");
+    const pos = token.start + ins.length;
+    input.setSelectionRange(pos, pos);
+    close();
+    try {
+      pick?.(s);
+    } catch (e) {
+      console.error("Tideline suggest", e);
+    }
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  };
+  view.registerDomEvent(document, "keydown", (e) => {
+    if (e.target !== input || !st || e.isComposing || e.keyCode === 229) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      st.index = (st.index + (e.key === "ArrowDown" ? 1 : -1) + st.items.length) % st.items.length;
+      paint();
+    } else if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+      const s = st.items[st.index];
+      if (e.key === "Enter" && s && s.insert === input.value.slice(st.token.start, st.token.end)) {
+        close();
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      choose(st.index);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      close();
+    }
+  }, true);
+  view.registerDomEvent(input, "input", update);
+  view.registerDomEvent(input, "click", update);
+  view.registerDomEvent(input, "keyup", (e) => {
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) update();
+  });
+  view.registerDomEvent(input, "compositionstart", () => {
+    ime = true;
+  });
+  view.registerDomEvent(input, "compositionend", () => {
+    ime = false;
+    update();
+  });
+  view.registerDomEvent(input, "blur", () => setTimeout(() => {
+    if (document.activeElement !== input) close();
+  }, 150));
+  view.registerDomEvent(view.root, "mousedown", (e) => {
+    const b3 = e.target.closest?.("[data-tl-pick]");
+    if (!b3 || !box?.contains(b3)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    choose(+b3.dataset.tlPick);
+  }, true);
+  return { close, update };
+}
+
 // src/ui/day-text.js
 function dayText(date2, today = "") {
   const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date2 || ""));
@@ -5584,8 +5732,9 @@ function openTodayInvestments(view, plugin, selectedDate) {
 }
 function createCapture({ view, plugin }) {
   const root = view.root, $5 = (s) => root.querySelector(s);
-  let open = false, type = "task";
+  let open = false, type = "task", capSuggest = null;
   function render() {
+    capSuggest?.close();
     $5("#capture-types").innerHTML = TYPES.map(([t, ic, name]) => `<button type="button" data-capture-type="${t}" aria-label="${name}" aria-pressed="${t === type}">${icon(ic)}<span class="capture-type-name" aria-hidden="true">${name}</span></button>`).join("");
     $5("#capture").hidden = !open;
     $5("#capture-description").hidden = type !== "task";
@@ -5731,6 +5880,7 @@ ${line}
     }
     input.value = "";
     tokens();
+    capSuggest?.close();
     open = false;
     render();
     await save(v2, description);
@@ -5781,6 +5931,26 @@ ${line}
     }
   }, { capture: true });
   render();
+  // 输入 # 或 @ 时列出已有的标签 / 人物，不选就按输入的内容新建
+  capSuggest = bindSuggestPopup(view, $5("#capture-input"), {
+    items: (token) => {
+      if (token.sign !== "#" && token.sign !== "@") return [];
+      const ix = plugin.index, q2 = token.query;
+      if (type === "task") return suggestions(token, { lists: ix.config.lists.map((l2) => ({ id: l2.title, title: l2.title, archived: l2.archived })), projects: [...ix.projects.values()], people: [...ix.people.values()], tasks: [...ix.tasks.values()] });
+      if (token.sign === "@") return type === "idea" ? suggestions(token, { lists: [], projects: [], people: [...ix.people.values()], tasks: [] }).filter((s) => !s.create) : [];
+      const stats = new Map(), add = (t, n = 1) => { if (t) stats.set(t, (stats.get(t) || 0) + n); };
+      if (type === "idea") {
+        for (const i of ix.ideas.values()) for (const t of i.tags || []) add(t);
+        for (const t of ix.config.ideaTags || []) if (!stats.has(t)) stats.set(t, 0);
+      } else if (type === "book" || type === "literature") {
+        for (const x2 of (type === "book" ? ix.books : ix.literature).values()) for (const t of x2.keywords || []) add(t);
+      } else return [];
+      return tagItems(stats, q2);
+    },
+    pick: (s) => {
+      if (type === "task" && s.create) HOST.createPerson?.(s.create);
+    }
+  });
   function openWith(text) {
     open = true;
     type = "task";
@@ -10751,11 +10921,58 @@ ${item.conclusion}`)}</pre>` : ""}
   let readingComponent = null;
   function readingBox(key, text, source) {
     mdStore.set(key, String(text || ""));
-    return `<div class="lib-abstract lib-reading markdown-rendered" data-lib-md="${key}" data-lib-source="${esc2(source || "")}"></div>`;
+    return `<div class="lib-abstract lib-reading markdown-rendered" data-lib-md="${key}" data-lib-source="${esc2(source || "")}"${key === "abstract" ? ' data-lib-fold="para"' : ""}></div>`;
   }
+  // 摘要最多显示第一段，关键信息每条最多两行；没显示完的在下面放「展开 / 收起」
+  const foldLabel = (open) => open ? "收起 △" : "展开 ▽";
+  function foldParas(el) {
+    try {
+      if (el.dataset.libFold !== "para" || !el.isConnected) return;
+      const kids = [...el.children].filter((k2) => k2.textContent.trim() || k2.querySelector("img,hr,table"));
+      if (kids.length < 2) return;
+      const first = kids[0];
+      let after = false;
+      for (const k2 of el.children) {
+        if (after) k2.classList.add("lib-fold-hide");
+        if (k2 === first) after = true;
+      }
+      const key = "abs|" + (el.dataset.libSource || ""), open = !!(d.ui.libFold ||= {})[key];
+      el.classList.toggle("is-open", open);
+      el.insertAdjacentHTML("afterend", `<button type="button" class="lib-fold-toggle" data-lib-fold-btn="${esc2(key)}" aria-expanded="${open}">${foldLabel(open)}</button>`);
+    } catch (e) {
+      console.error("Tideline library fold", e);
+    }
+  }
+  function markPoints(root) {
+    try {
+      const id = d.ui.librarySelected?.id || "";
+      for (const li of root.querySelectorAll(".lib-points li")) {
+        const box = li.querySelector(".lib-point"), tx = li.querySelector(".lib-point-text");
+        if (!box || !tx || box.querySelector(".lib-fold-toggle")) continue;
+        const key = "pt|" + id + "|" + li.dataset.libPt, open = !!(d.ui.libFold ||= {})[key];
+        li.classList.toggle("is-open", open);
+        if (!open && tx.scrollHeight <= tx.clientHeight + 1) continue;
+        box.insertAdjacentHTML("beforeend", `<button type="button" class="lib-fold-toggle" data-lib-fold-btn="${esc2(key)}" aria-expanded="${open}">${foldLabel(open)}</button>`);
+      }
+    } catch (e) {
+      console.error("Tideline library points", e);
+    }
+  }
+  HOST.addEventListener("click", (e) => {
+    const b3 = e.target.closest?.("[data-lib-fold-btn]");
+    if (!b3) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const key = b3.dataset.libFoldBtn, fold = d.ui.libFold ||= {}, open = fold[key] = !fold[key];
+    if (key.startsWith("abs|")) b3.previousElementSibling?.classList.toggle("is-open", open);
+    else b3.closest("li")?.classList.toggle("is-open", open);
+    b3.textContent = foldLabel(open);
+    b3.setAttribute("aria-expanded", String(open));
+  });
   function paintReading(root) {
     readingComponent?.unload();
     readingComponent = null;
+    requestAnimationFrame(() => markPoints(root));
     const targets = [...root.querySelectorAll("[data-lib-md]")];
     if (!targets.length) return;
     const app = window.app, component = readingComponent = new import_obsidian7.Component();
@@ -10769,7 +10986,7 @@ ${item.conclusion}`)}</pre>` : ""}
         e.stopImmediatePropagation();
         app.workspace.openLinkText(link.dataset.href || link.getAttribute("href"), source, e.metaKey || e.ctrlKey);
       }, { capture: true });
-      import_obsidian7.MarkdownRenderer.render(app, markdown, el, source, component).catch((error) => {
+      import_obsidian7.MarkdownRenderer.render(app, markdown, el, source, component).then(() => foldParas(el)).catch((error) => {
         if (el.isConnected) el.textContent = markdown;
         console.error("Tideline library reading", error);
       });
@@ -10778,7 +10995,7 @@ ${item.conclusion}`)}</pre>` : ""}
   function recordPane(kind, item) {
     const m2 = meta(kind, item), sub = d.ui.librarySub || "abstract", links2 = item.projectIds.map((id) => a2.project(id));
     const entryLabel={abstract:"关键信息",note:"我的笔记",marks:"我的标注",related:"相关内容"}[sub]||"我的笔记";
-    const body = sub === "abstract" ? `<h4>\u6458\u8981</h4>${readingBox("abstract", m2.abstract, item.id)}<h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li>${[icon2("note"), G3("goal"), icon2("route")][i%3]}<span><b>${esc2(k2)}</b>${esc2(v2)}</span></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2, i3) => `<li>${readingBox("mark" + i3, x2, item.id)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes ? readingBox("related", m2.relatedNotes, item.id) : ""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`${m2.note ? readingBox("note", m2.note, item.id) : '<p class="lib-abstract"><span class="lib-none">还没有笔记。</span></p>'}`}`;
+    const body = sub === "abstract" ? `<h4>\u6458\u8981</h4>${readingBox("abstract", m2.abstract, item.id)}<h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li data-lib-pt="${i}">${[icon2("note"), G3("goal"), icon2("route")][i%3]}<div class="lib-point"><span class="lib-point-text"><b>${esc2(k2)}</b>${esc2(v2)}</span></div></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2, i3) => `<li>${readingBox("mark" + i3, x2, item.id)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes ? readingBox("related", m2.relatedNotes, item.id) : ""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`${m2.note ? readingBox("note", m2.note, item.id) : '<p class="lib-abstract"><span class="lib-none">还没有笔记。</span></p>'}`}`;
     return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${esc2(item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>\u6253\u5F00 PDF</span>`, "\u6253\u5F00 PDF", 'class="lib-pdf"')}</div></header>
  <div class="lib-tags">${m2.keywords.map((k2) => `<span class="lib-chip hand-pill">${esc2(k2)}</span>`).join("")}</div>
  <div class="lib-subtabs" role="tablist">${[["abstract", "\u6458\u8981"], ["note", "\u7B14\u8BB0"], ["marks", `\u6807\u6CE8 (${m2.marks.length})`], ["related", `\u76F8\u5173 (${related(kind, item).length+(m2.relatedNotes||"").split(/\n+/).filter(Boolean).length})`]].map(([k2, l2]) => B3("library-sub", k2, l2, l2, `role="tab" aria-selected="${sub === k2}"`)).join("")}</div>
