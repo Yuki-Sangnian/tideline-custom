@@ -10940,14 +10940,21 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     if (key === "library-view") $5(id === "shelf" ? ".lib-back" : ".lib-view-toggle")?.focus();
     return true;
   }
-  // 书的阅读阶段跟着进度走：进度到 100%（或当前页等于总页数）→ 读完；进度从 0 变成有（或当前页不是 0）→ 想读改为在读。放弃的书不动
+  // 书的阅读阶段跟着进度走：进度到 100%（或当前页等于总页数）→ 读完；进度从 0 变成有（或当前页不是 0）→ 想读改为在读；进度是 0 或空 → 想读。放弃的书不动
   function syncBookStage(kind, item, m) {
-    if (kind !== "book" || !item || !["want", "reading"].includes(item.stage)) return;
+    if (kind !== "book" || !item || !["want", "reading", "done"].includes(item.stage)) return;
     const progress = Number(m.progress) || 0, page = Number(m.currentPage) || 0, total = Number(m.totalPages) || 0;
     if (progress >= 100 || (total > 0 && page === total)) {
-      item.stage = "done";
-      item.readDate = d.clock.date;
-    } else if (item.stage === "want" && (progress > 0 || page > 0)) item.stage = "reading";
+      if (item.stage !== "done") {
+        item.stage = "done";
+        item.readDate = d.clock.date;
+      }
+    } else if (progress > 0 || page > 0) {
+      if (item.stage === "want") item.stage = "reading";
+    } else if (item.stage !== "want") {
+      item.stage = "want";
+      item.readDate = null;
+    }
   }
   function submit(f, quiet=false) {
     const sel = d.ui.librarySelected;
