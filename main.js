@@ -11005,7 +11005,7 @@ function libraryPage(a2) {
         }
         return { rows: shut || sections ? [] : rows, sections, shut, count: items.length };
       });
-      const need = groups.map((g2) => g2.sections ? 22 + g2.sections.reduce((n2, sec) => n2 + (sec.open ? 14 + sec.rows.length * (ch + gap) + 12 : 30), 0) + 6 : 18 + g2.rows.length * (ch + gap) + 6);
+      const need = groups.map((g2) => g2.sections ? 40 + g2.sections.reduce((n2, sec) => n2 + (sec.open ? 14 + sec.rows.length * (ch + gap) + 12 : 30), 0) + 6 : 18 + g2.rows.length * (ch + gap) + 6);
       return { kind, x2, area, cols, cw, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
     });
     // 内容多到放不下时，整页往下加长（绳子也跟着变长）；少了再缩回来
@@ -11023,7 +11023,7 @@ function libraryPage(a2) {
         }));
         let off = 0;
         for (const sec of g2.sections || []) {
-          const sy = y2 + 22 + off;
+          const sy = y2 + 40 + off;
           out.years.push({ kind, stage: stage2, year: sec.year, key: sec.key, label: sec.label, count: sec.count, open: sec.open, x: x2, y: sy });
           sec.rows.forEach((row, r) => row.forEach((item, col) => {
             out.cards.push({ kind, item, col, row: r, sec: sec.key, sy, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: sy + 14 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
