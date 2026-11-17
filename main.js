@@ -5958,7 +5958,6 @@ ${line}
       undo = () => plugin.writer.trash(path);
       label = `${isBook ? "书籍" : "文献"}：${title}`;
       createdLibrary={kind:isBook?"book":"literature",id:path};
-      plugin.writer.open(path);
     } else if (type === "idea") {
       const content = text.replace(TOKENS, m => m.startsWith("#") ? "" : m).trim();
       const [firstLine, ...bodyLines] = content.split("\n");
