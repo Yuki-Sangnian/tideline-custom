@@ -4070,3 +4070,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .lib-record .lib-reading h3{font-size:16.5px!important}
 .compass-root .lib-record .lib-reading :is(h4,h5,h6){font-size:15px!important}
 .compass-root .lib-record .lib-reading :is(h1,h2,h3,h4,h5,h6):first-child{margin-top:0!important}
+/* 今日页「想到了什么？」输入行：固定在右下角，不随页面上下滚动（位置和宽度由脚本对齐右边那一列） */
+.compass-root #today #journal-form{position:fixed;z-index:20;bottom:14px;margin:0;padding:6px 0 4px;background:var(--paper);box-sizing:border-box}
+.compass-root #today .today-subsection[data-today-group="journal"]{padding-bottom:52px}

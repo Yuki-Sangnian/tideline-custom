@@ -6383,6 +6383,15 @@ function createToday({ root, art, ui }) {
   function fit(box2) {
     const journal = $5("#journal"), form = $5("#journal-form"), wrap = $5(".other-task-items");
     const top = journal.getBoundingClientRect().top, formH = form.getBoundingClientRect().height;
+    // 「想到了什么？」输入行固定在右下角，不随页面滚动：宽度和左边位置对齐右边那一列
+    {const col = $5("#today .right-column"), rr = root.getBoundingClientRect();
+      if (col && form) {
+        const cr = col.getBoundingClientRect();
+        if (cr.width) {
+          form.style.left = Math.round(cr.left - rr.left) + "px";
+          form.style.width = Math.round(cr.width) + "px";
+        }
+      }}
     const rows = wrap && !wrap.querySelector(".detail-inline") ? [...wrap.children] : [];
     if (wrap) {
       wrap.style.maxHeight = "";
