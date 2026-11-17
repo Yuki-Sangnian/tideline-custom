@@ -11071,7 +11071,8 @@ function libraryPage(a2) {
   // 读书笔记那一块（右边）的高度：折叠只有标题一行，展开再加每条链接
   function branchHeight(w2, item) {
     const x = Math.round(w2 * 0.75), width = Math.max(150, w2 - x - 12), closed = !!(d.ui.libraryNoteShut ??= {})[item.id], links = noteLinks("book", item);
-    return closed ? 34 : 38 + links.reduce((sum, l2) => sum + Math.max(38, Math.ceil(Array.from(l2.label).reduce((n2, c) => n2 + (c.charCodeAt(0) > 255 ? 13 : 7), 0) / Math.max(80, width - 40)) * 19.5 + 10), 0);
+    // 每条笔记名：自己换行是正常行距（19.5px），条与条之间多留 0.25 个行距，所以名字短的挨得近，名字长的、换了行的自然拉开
+    return closed ? 34 : 40 + links.reduce((sum, l2, i) => sum + Math.ceil(Array.from(l2.label).reduce((n2, c) => n2 + (c.charCodeAt(0) > 255 ? 13 : 7), 0) / Math.max(80, width - 40)) * 19.5 + (i ? 4.9 : 0), 0);
   }
   function seaLayout(w2, h) {
     const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
