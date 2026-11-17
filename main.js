@@ -12785,13 +12785,17 @@ function automaticQuarter(ix, date) {
   const year = Number(date.slice(0,4)), q = Math.floor((Number(date.slice(5,7))-1)/3);
   const iso = d => d.toISOString().slice(0,10), start = iso(new Date(Date.UTC(year,q*3,1))), end = iso(new Date(Date.UTC(year,q*3+3,1))), prev = iso(new Date(Date.UTC(year,q*3-3,1))), nextEnd = iso(new Date(Date.UTC(year,q*3+6,1)));
   const real = x => !ix.examples?.has(x.id || x.path), inside = (d,a,b) => !!d && d >= a && d < b;
+  // 配舱：投入记在某个任务上、而这个任务关联了项目的，就按项目合并成一条（项目的总用时）；没关联项目的任务，还是显示任务本身
+  const keep = new Set([...ix.projects.values(), ...ix.goals.values()].map(x => x.title)), taskProject = new Map();
+  for (const t of ix.tasks.values()) if (t.title && t.project && !taskProject.has(t.title)) taskProject.set(t.title, t.project);
+  const projectOf = name => keep.has(name) ? name : (taskProject.get(name) || name);
   const round = n => Math.round(n*10)/10;
   const sum = (a,b) => {
     const days = [...ix.days.values()].filter(r => real(r) && inside(r.date,a,b) && r.date <= date);
     const tasks = [...ix.tasks.values()].filter(t => real(t) && t.status === "done" && inside(t.completed || t.date,a,b) && (t.completed || t.date) <= date);
     const effort = {}, sleeps = [], habitValues = []; let waterDays=0;
     for (const day of days) {
-      for (const [name,hours] of Object.entries(day.effort || {})) if(Number(hours)>0) effort[name]=(effort[name]||0)+Number(hours);
+      for (const [name0,hours] of Object.entries(day.effort || {})) if(Number(hours)>0) { const name = projectOf(name0); effort[name]=(effort[name]||0)+Number(hours); }
       if(day.sleepHours != null && Number.isFinite(Number(day.sleepHours))) sleeps.push(Number(day.sleepHours));
       for(const habit of ix.config.habits) { if(habit.id in day.habits) habitValues.push(!!day.habits[habit.id]); if((habit.id === "water" || /喝.*水|饮水|喝水/.test(habit.name)) && day.habits[habit.id]) waterDays++; }
     }
