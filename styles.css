@@ -4146,3 +4146,15 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #review[data-q-grow] .quarter-sheet .q-grid{grid-template-rows:minmax(0,1fr) minmax(0,1fr) var(--q-row3)}
 .compass-root #review[data-q-grow]::after{content:"";position:absolute;left:0;top:calc(100% + var(--q-extra,0px));width:1px;height:1px;pointer-events:none}
 @container compass (max-height: 820px){.compass-root #review[data-q-grow] .quarter-sheet{height:calc(100% - 72px + var(--q-extra,0px))}}
+
+/* 季度页顶上的「2026 · 第 4 季」：年份和季度各是一个滚轮（鼠标放上去，上下露出前一个 / 后一个，滚轮或点它就能换） */
+.compass-root #review .q-picks{display:inline-flex;align-items:center;gap:6px}
+.compass-root #review .q-pick{position:relative;display:inline-block;padding:0 8px;border-radius:10px;cursor:ns-resize;outline:none}
+.compass-root #review .q-pick b{font-weight:inherit}
+.compass-root #review .q-pick:is(:hover,:focus-visible){background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.compass-root #review .q-step{position:absolute;left:50%;transform:translateX(-50%);padding:0;border:0;background:none;box-shadow:none;font:400 13px/1 var(--serif);color:var(--secondary);white-space:nowrap;opacity:0;pointer-events:none;cursor:pointer}
+.compass-root #review .q-step-up{bottom:100%;margin-bottom:2px}
+.compass-root #review .q-step-down{top:100%;margin-top:2px}
+.compass-root #review .q-pick:is(:hover,:focus-within) .q-step{opacity:.6;pointer-events:auto}
+.compass-root #review .q-step:hover{opacity:1!important;color:var(--ink)}
+.compass-root #review .log-day-turn[disabled]{opacity:.25;cursor:default}

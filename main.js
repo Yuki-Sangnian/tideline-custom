@@ -10351,7 +10351,8 @@ function reviewPage(a2) {
  <section class="wk-block"><h4>${icon2("flag")}<span>\u6210\u5C31</span></h4><div class="wk-body">${list2(all("achievements"), "")}${sketch("ship")}</div></section>
  <section class="wk-block"><h4>${G3("lead")}<span>\u611F\u6069</span></h4><div class="wk-body">${list2(all("gratitude"), "")}${sketch("light")}</div></section>
  <section class="wk-block wk-quote-block"><h4>${icon2("note")}<span>本周寄语</span><span class="wk-h-sketch">${sketch("ridge")}</span></h4><div class="wk-quotes">${quotes}</div></section></div>`;
-    return left + right;
+    const r3 = d.review, wb = d.ui.reviewWeekBack || 0;
+    return left + right + `<nav class="log-day-turners" aria-label="按周翻页">${B3("review-week-prev", "", G3("left"), "前一周", `class="log-day-turn log-day-turn-prev"${wb >= (r3.weekBackMax || 0) ? " disabled" : ""}`)}${B3("review-week-next", "", G3("right"), "后一周", `class="log-day-turn log-day-turn-next"${wb <= 0 ? " disabled" : ""}`)}</nav>`;
   }
   d.review.quarter ??= {
     harvest: [["\u5B9E\u9A8C\u65B9\u6CD5\u6709\u4E86\u521D\u7A3F", true], ["\u5EFA\u7ACB\u4E86\u66F4\u7A33\u5B9A\u7684\u8EAB\u4F53\u8282\u5F8B", true], ["\u63A8\u52A8\u4E86\u7814\u7A76\u65B9\u5411\u7684\u7CFB\u7EDF\u68B3\u7406", true], ["\u4E0E\u5BB6\u4EBA\u6709\u4E86\u66F4\u591A\u9AD8\u8D28\u91CF\u76F8\u5904", false]],
@@ -10452,6 +10453,16 @@ function reviewPage(a2) {
     s += `<circle cx="${c}" cy="${c}" r="18" fill="${a2.PAPER}"/>` + circle2(c, c, 18, 1.4) + circle2(c, c, 5, 1);
     return `<svg class="quarter-rose" viewBox="-40 -10 580 520" aria-label="\u672C\u5B63\u5EA6\u751F\u547D\u4E4B\u8F6E">${s}</svg>`;
   }
+  // 季度页顶上的「2026 · 第 4 季」：年份和季度各是一个滚轮，悬停时上下各露出前一个 / 后一个，用鼠标滚轮、点上下的小字、或按上下键选；最早到刚开始用的那一季，最晚到现在这一季
+  const qIndex = () => {
+    const cur = Number(d.clock.date.slice(0, 4)) * 4 + Math.floor((Number(d.clock.date.slice(5, 7)) - 1) / 3), min = cur - (d.review.quarterBackMax || 0), sel = cur - (d.ui.reviewQuarterBack || 0);
+    return { cur, min, sel, clamp: (i) => Math.max(min, Math.min(cur, i)) };
+  };
+  function qPick(kind) {
+    const { sel, clamp } = qIndex(), year = kind === "year", step = year ? 4 : 1, show = (i) => year ? String(Math.floor(i / 4)) : "第 " + (i % 4 + 1) + " 季";
+    const btn = (delta, cls) => { const to = clamp(sel + delta); return to === sel ? "" : B3("review-q-step", String(delta), show(to), (delta < 0 ? "前一" : "后一") + (year ? "年" : "季") + "：" + show(to), `class="q-step ${cls}"`); };
+    return `<span class="q-pick" data-q-pick="${kind}" tabindex="0" role="spinbutton" aria-label="${year ? "年份" : "季度"}，滚动鼠标滚轮或按上下方向键选择">${btn(-step, "q-step-up")}<b>${year ? Math.floor(sel / 4) : "第 " + (sel % 4 + 1) + " 季"}</b>${btn(step, "q-step-down")}</span>`;
+  }
   function quarterPage() {
     const selected = d.review.wheel.find((r) => r.id === d.ui.wheelMenu);
     const harvest = `<section class="q-card hand-panel q-harvest"><h4>${icon2("flag")}<span>\u672C\u5B63\u9760\u5CB8</span><small>\u4E3B\u8981\u6536\u83B7</small></h4><ul class="q-checks">${Q2.harvest.map(([t, ok]) => `<li>${ok ? icon2("check") : icon2("circle")}<span>${esc2(t)}</span></li>`).join("")}</ul><p class="q-foot">\u9760\u5CB8 <b class="mono">${Q2.harvest.filter((x2) => x2[1]).length} / ${Q2.harvest.length}</b><span>${svg3(Q2.harvest.map((x2, i) => a2.circle(8 + i * 18, 7, 4, 1.1) + (x2[1] ? `<circle cx="${8 + i * 18}" cy="7" r="2.2" fill="${a2.INK}"/>` : "")).join("") + ink2([[12, 7], [22, 7]], 0.6) + ink2([[30, 7], [40, 7]], 0.6) + ink2([[48, 7], [58, 7]], 0.6), 70, 14)}</span></p></section>`;
@@ -10468,7 +10479,7 @@ function reviewPage(a2) {
     const trend = `<section class="q-card hand-panel q-trend"><h4>${G3("route")}<span>\u822A\u901F</span><small>\u6574\u4F53\u8D8B\u52BF</small><span class="q-legend"><i class="solid"></i>\u4EFB\u52A1\u5B8C\u6210\u6570<i class="dash"></i>时间投入 (h)</span></h4>${qTrend()}</section>`;
     const time = `<section class="q-card hand-panel q-time"><h4>${icon2("sunrise")}<span>\u914D\u8231</span><small>\u65F6\u95F4\u6295\u5165</small><span class="q-legend">\u672C\u5B63\u5171 <b class="mono">${formatEffortHours(Q2.totalHours || 0)} h</b></span></h4>${qCargo()}</section>`;
     const quote = `<section class="q-card hand-panel q-quote"><h4 data-edit-quarter-note role="button" tabindex="0" aria-label="编辑航海日志">${icon2("note")}<span>\u822A\u6D77\u65E5\u5FD7</span><small>\u672C\u5B63\u4E00\u53E5\u8BDD</small></h4><blockquote>${esc2(d.review.quarterText)}</blockquote><p class="q-quote-sign">\u2014 \u8BB0\u4E8E ${d.review.quarterEdited ? fmt(d.review.quarterEdited) : "尚未编辑"}</p>${sketch("light")}</section>`;
-    return `<div class="quarter-sheet"><div class="q-head"><div class="log-date">${Q2.year} · 第 ${Q2.quarter} 季</div><span class="log-weekday">${(Q2.quarter-1)*3+1}月 – ${Q2.quarter*3}月</span>${B3("review-source", "", G3("corner"), "\u6253\u5F00\u5B63\u5EA6\u590D\u76D8\u7B14\u8BB0", 'class="quarter-fold"')}</div>${voyage()}<div class="q-grid">${harvest}${wheel}${directions}${metrics}${experiments}${trend}${time}${quote}</div>${d.ui.reviewSource ? `<pre class="quarter-source markdown-preview">${esc2(`${d.review.quarterId}
+    return `<div class="quarter-sheet"><div class="q-head"><div class="log-date q-picks">${qPick("year")} · ${qPick("quarter")}</div><span class="log-weekday">${(Q2.quarter-1)*3+1}月 – ${Q2.quarter*3}月</span>${B3("review-source", "", G3("corner"), "\u6253\u5F00\u5B63\u5EA6\u590D\u76D8\u7B14\u8BB0", 'class="quarter-fold"')}</div>${voyage()}<div class="q-grid">${harvest}${wheel}${directions}${metrics}${experiments}${trend}${time}${quote}</div>${d.ui.reviewSource ? `<pre class="quarter-source markdown-preview">${esc2(`${d.review.quarterId}
 
 ${d.review.quarterText}
 
@@ -10553,11 +10564,34 @@ ${d.review.wheel.map((r) => r.title + ": " + (r.value ?? "")).join("\n")}`)}</pr
     } else if (key === "review-next") {
       d.ui.reviewPeriod = "day";
       d.ui.reviewDay = Math.min(6, d.ui.reviewDay + 1);
+    } else if (key === "review-week-prev" || key === "review-week-next") {
+      d.ui.reviewWeekBack = Math.max(0, Math.min(d.review.weekBackMax || 0, (d.ui.reviewWeekBack || 0) + (key === "review-week-prev" ? 1 : -1)));
+      a2.reviewSelect?.();
+    } else if (key === "review-q-step") {
+      const q3 = qIndex();
+      d.ui.reviewQuarterBack = q3.cur - q3.clamp(q3.sel + Number(id));
+      a2.reviewSelect?.();
     } else if (key === "review-source") d.ui.reviewSource = !d.ui.reviewSource;
     else if (key === "review-trend") return true;
     a2.update();
     return true;
   }
+  // 在年份 / 季度上滚动鼠标滚轮：往下滚 = 往后一年 / 一季，往上滚 = 往前；滚到最早那一季和现在这一季就停
+  let wheelAcc = 0, wheelAt = 0, wheelStep = 0;
+  HOST.addEventListener("wheel", (e) => {
+    const pick = e.target.closest?.("[data-q-pick]");
+    if (!pick || d.ui.page !== "review" || d.ui.reviewPeriod !== "quarter") return;
+    e.preventDefault();
+    const now = performance.now();
+    if (now - wheelAt > 300) wheelAcc = 0;
+    wheelAt = now;
+    wheelAcc += e.deltaY;
+    if (Math.abs(wheelAcc) < 40 || now - wheelStep < 120) return;
+    const dir = wheelAcc > 0 ? 1 : -1;
+    wheelAcc = 0;
+    wheelStep = now;
+    action("review-q-step", String(dir * (pick.dataset.qPick === "year" ? 4 : 1)));
+  }, { passive: false });
   function wheelMenu(id) {
     d.ui.wheelMenu = id;
     a2.update();
@@ -10828,6 +10862,16 @@ ${d.review.wheel.map((r) => r.title + ": " + (r.value ?? "")).join("\n")}`)}</pr
         wheelMenu(r.id);
         return true;
       }
+    }
+    if (d.ui.reviewPeriod === "week" && ["ArrowLeft", "ArrowRight"].includes(e.key) && !e.altKey && !e.target.closest?.("input,textarea,select,[contenteditable]")) {
+      e.preventDefault();
+      action(e.key === "ArrowLeft" ? "review-week-prev" : "review-week-next");
+      return true;
+    }
+    if (e.target.closest?.("[data-q-pick]") && ["ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      action("review-q-step", String((e.key === "ArrowUp" ? -1 : 1) * (e.target.closest("[data-q-pick]").dataset.qPick === "year" ? 4 : 1)));
+      return true;
     }
     if (d.ui.reviewPeriod === "day" && ["ArrowLeft", "ArrowRight"].includes(e.key) && !e.altKey) {
       e.preventDefault();
@@ -12749,6 +12793,54 @@ var defaultUI = (date2) => ({
   brainQuery: "",
   brainList: false
 });
+// 复盘页：一天的数据（日期、睡眠、习惯、问题评分、投入、随手记……）
+function makeDayOf(ix) {
+  return (x2) => {
+      const r = ix.days.get(x2) || { habits: {}, scores: {}, effort: {}, journal: [], achievements: [], gratitude: [], quote: "" };
+      return {
+        date: x2,
+        sleepStartDate: r.sleepStartDate || "",
+        sleepEndDate: r.sleepEndDate || "",
+        sleepStart: r.sleepStart || "",
+        sleepEnd: r.sleepEnd || "",
+        sleepHours: r.sleepHours ?? null,
+        habits: ix.config.habits.map((h) => h.id in r.habits ? !!r.habits[h.id] : null),
+        questions: ix.config.questions.map((q2) => r.scores[q2.id] != null ? Number(r.scores[q2.id]) : null),
+        investments: Object.entries(r.effort).map(([title, hours2]) => ({ id: title, title, hours: Number(hours2) || 0 })),
+        journal: r.journal.map((n) => ({ time: n.time, text: n.text })),
+        achievements: [...r.achievements || []],
+        gratitude: [...r.gratitude || []],
+        quote: r.quote || ""
+      };
+    };
+}
+// 复盘页：当前选中的那一周、那一季的数据（可以往前翻到刚开始用的那一周 / 那一季，往后翻到现在）
+function reviewSlice(ix, d, date2, dayOf) {
+  const wBack = Math.max(0, d.ui.reviewWeekBack || 0), qBack = Math.max(0, d.ui.reviewQuarterBack || 0);
+  const real = (x2) => !ix.examples?.has(x2.path), dates = [...ix.days.values()].filter(real).map((x2) => x2.date).sort(), first = dates[0] || date2;
+  const curStart = HOST.weekStart(date2), qIdx = (dd) => Number(dd.slice(0, 4)) * 4 + Math.floor((Number(dd.slice(5, 7)) - 1) / 3);
+  const weekBackMax = Math.max(0, Math.round((Date.parse(curStart + "T12:00:00Z") - Date.parse(HOST.weekStart(first) + "T12:00:00Z")) / (7 * 864e5))), quarterBackMax = Math.max(0, qIdx(date2) - qIdx(first));
+  const weekBack = Math.min(wBack, weekBackMax), quarterBack = Math.min(qBack, quarterBackMax);
+  const selStart = addDays4(curStart, -7 * weekBack), weekDates = Array.from({ length: 7 }, (_2, i) => addDays4(selStart, i));
+  const trend = Array.from({ length: 12 }, (_2, i) => {
+    const s2 = addDays4(selStart, (i - 11) * 7), e2 = addDays4(s2, 6);
+    return d.tasks.filter((t) => !t.example && t.status === "done" && (t.completed || t.date) >= s2 && (t.completed || t.date) <= e2).length;
+  });
+  const qi = qIdx(date2) - quarterBack, qYear = Math.floor(qi / 4), qNo = qi % 4;
+  const qDate = quarterBack ? new Date(Date.UTC(qYear, qNo * 3 + 3, 0)).toISOString().slice(0, 10) : date2, quarterId = quarterOf(qDate), quarter = ix.quarters.get(quarterId) || {};
+  return {
+    weekBack, weekBackMax, quarterBack, quarterBackMax,
+    weekDates,
+    trend,
+    days: weekDates.map(dayOf),
+    wheel: ix.config.areas.map((a2) => ({ id: a2.id, title: a2.title, value: quarter.wheel?.[a2.id] != null ? Number(quarter.wheel[a2.id]) : null })),
+    quarterText: quarter.text || "",
+    quarter: { ...automaticQuarter(ix, qDate), experiments: (quarter.experiments || []).map((x2) => [x2.title, !!x2.done, (x2.trend || []).map(Number)]) },
+    quarterId,
+    quarterEdited: quarter.edited || ""
+  };
+}
+
 function buildModel(index, clock, prev) {
   const { date: date2, time } = clock, ix = index;
   const byTitle = (map, t) => {
@@ -12866,24 +12958,7 @@ function buildModel(index, clock, prev) {
   const today = ix.days.get(date2);
   d.weekly = today?.quote || "";
   const weekStart = HOST.weekStart(date2), weekDates = Array.from({ length: 7 }, (_2, i) => addDays4(weekStart, i));
-  const dayOf = (x2) => {
-    const r = ix.days.get(x2) || { habits: {}, scores: {}, effort: {}, journal: [], achievements: [], gratitude: [], quote: "" };
-    return {
-      date: x2,
-      sleepStartDate: r.sleepStartDate || "",
-      sleepEndDate: r.sleepEndDate || "",
-      sleepStart: r.sleepStart || "",
-      sleepEnd: r.sleepEnd || "",
-      sleepHours: r.sleepHours ?? null,
-      habits: ix.config.habits.map((h) => h.id in r.habits ? !!r.habits[h.id] : null),
-      questions: ix.config.questions.map((q2) => r.scores[q2.id] != null ? Number(r.scores[q2.id]) : null),
-      investments: Object.entries(r.effort).map(([title, hours2]) => ({ id: title, title, hours: Number(hours2) || 0 })),
-      journal: r.journal.map((n) => ({ time: n.time, text: n.text })),
-      achievements: [...r.achievements || []],
-      gratitude: [...r.gratitude || []],
-      quote: r.quote || ""
-    };
-  };
+  const dayOf = makeDayOf(ix);
   const weekEffort = {};
   const realEffortNames = new Set([...ix.goals.values(), ...ix.projects.values()].filter(item => !EX.has(item.id || item.path)).map(item => item.title));
   for (const date of weekDates) {
@@ -12958,35 +13033,14 @@ function buildModel(index, clock, prev) {
     const f = x2.filter || {}, ref = (map, t) => byTitle(map, String(t || "").replace(/^\[\[|\]\]$/g, ""));
     return { id: "v" + i, title: x2.title, filter: f.kind === "tag" ? { kind: "tag", id: f.tag } : f.kind === "project" ? { kind: "project", id: ref(ix.projects, f.project) } : f.kind === "person" ? { kind: "person", id: ref(ix.people, f.person) } : f.kind === "list" ? { kind: "list", id: f.list } : { kind: f.kind || "all" } };
   });
-  const quarter = ix.quarters.get(quarterOf(date2)) || {};
-  const done2 = (t) => t.status === "done";
-  const trend = Array.from({ length: 12 }, (_2, i) => {
-    const s = addDays4(weekStart, (i - 11) * 7), e = addDays4(s, 6);
-    return d.tasks.filter((t) => !t.example && done2(t) && (t.completed || t.date) >= s && (t.completed || t.date) <= e).length;
-  });
   const md52 = date2.slice(4), pastYears = [...ix.days.values()].filter((x2) => x2.date.slice(4) === md52 && x2.date < date2 && x2.done.length).sort((a2, b3) => b3.date.localeCompare(a2.date)).slice(0, 4).map((x2, i) => ({ year: Number(x2.date.slice(0, 4)), items: [...x2.done], sketch: SKETCH[i % SKETCH.length] }));
   d.review = {
-    weekDates,
-    trend,
-    days: weekDates.map(dayOf),
-    wheel: ix.config.areas.map((a2) => ({ id: a2.id, title: a2.title, value: quarter.wheel?.[a2.id] != null ? Number(quarter.wheel[a2.id]) : null })),
-    quarterText: quarter.text || "",
-    quarter: {
-      harvest: (quarter.harvest || []).map((h) => [String(h.title), !!h.done]),
-      metrics: (quarter.metrics || []).map((m2) => [m2.icon, m2.title, String(m2.value), m2.unit || "", m2.change || ""]),
-      directions: (quarter.directions || []).map((x2) => [x2.icon, x2.title, Number(x2.progress) || 0]),
-      experiments: (quarter.experiments || []).map((x2) => [x2.title, !!x2.done, (x2.trend || []).map(Number)]),
-      tasks: (quarter.tasks || []).map(Number),
-      hours: (quarter.hours || []).map(Number),
-      time: (quarter.time || []).map((x2) => [x2.title, Number(x2.share) || 0])
-    },
+    ...reviewSlice(ix, d, date2, dayOf),
     pastYears,
     history: Object.fromEntries([...ix.days.values()].filter(day => !ix.examples?.has(day.path)).map(day => [day.date,{quote:day.quote||"",journal:day.journal||[]}]))
   };
+
   d.ui.reviewDay = prev ? d.ui.reviewDay : Math.max(0, weekDates.indexOf(date2));
-  d.review.quarter = {...automaticQuarter(ix, date2), experiments:d.review.quarter.experiments};
-  d.review.quarterId = quarterOf(date2);
-  d.review.quarterEdited = quarter.edited || "";
   const active = d.projects.filter((p) => ["active", "planned", "paused"].includes(p.status));
   // 默认视图列什么：进行中的目标和项目、已关联项目的想法、今天和高优先级（高、最高）的未完成任务、收藏的文献和书、
   // 以及和进行中的项目或未完成任务有关的人物。数量不设上限，随你的数据自动变化
@@ -13197,7 +13251,7 @@ function createPersist(writer) {
       for (const id of [...trash]) if (!trashed.has(id) && !hold?.has(id) && (present(id) || !["tasks", "goals", "people"].some((k2) => previous[k2].has(id)))) trash.delete(id);
       if (now.config !== previous.config) jobs.push({ path: FOLDERS.config, run: () => writer.frontmatter(FOLDERS.config, (fm) => applyFm(fm, now.configObj, previous.configObj)) });
       if (now.quarter !== last.quarter) {
-        const q2 = `${FOLDERS.quarters}/${d.clock.date.slice(0, 4)}-Q${Math.floor((Number(d.clock.date.slice(5, 7)) - 1) / 3) + 1}.md`, { text, ...fmA } = now.quarterObj, { text: textB, ...fmB } = last.quarterObj;
+        const q2 = `${FOLDERS.quarters}/${d.review.quarterId}.md`, { text, ...fmA } = now.quarterObj, { text: textB, ...fmB } = last.quarterObj;
         jobs.push({ path: q2, run: async () => {
           await writer.frontmatter(q2, (fm) => applyFm(fm, fmA, fmB));
           if (text !== textB) await writer.body(q2, (s) => setLead(s, text));
@@ -13406,6 +13460,8 @@ function createLower(view) {
     navigate: (page2) => view.go(page2),
     drawScenery: () => view.drawScenery(),
     announce: (msg, undo) => view.frame.feedback(msg, undo),
+    // 复盘页翻到别的周 / 别的季之后，重新取那一周 / 那一季的数据
+    reviewSelect: () => view.lower?.reviewSelect?.(),
     // 知识库里「折叠了哪些阶段」这类界面状态：存在这台设备上，下次打开还是这样
     libraryUi: {
       read: () => plugin.local?.libraryUi || {},
@@ -13445,6 +13501,12 @@ function createLower(view) {
     },
     model,
     hold,
+    // 复盘页翻到别的周 / 别的季：重新取那一周 / 那一季的数据，并把它当作「已经保存的状态」，不会被当成改动写回
+    reviewSelect() {
+      if (!d) return;
+      Object.assign(d.review, reviewSlice(plugin.index, d, plugin.clock().date, makeDayOf(plugin.index)));
+      persist.reset(d);
+    },
     // 插件自己改了模型（键盘、计时器、撤销纸条消失）之后调用：照常排一次写回
     touch() {
       if (closed4) return;
@@ -20232,7 +20294,7 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       card.classList.add("editing-quarter-note");input.focus();this.frames();
       save.onclick=async()=>{
         save.disabled=true;
-        const date=p.clock().date, key=quarterOf(date), path=`${FOLDERS.quarters}/${key}.md`;
+        const date=p.clock().date, key=this.lower?.data?.review?.quarterId||quarterOf(date), path=`${FOLDERS.quarters}/${key}.md`;
         try {
           if(!p.app.vault.getAbstractFileByPath(path))await p.writer.create(path,"---\n---\n");
           await p.writer.body(path,text=>setLead(text,input.value));
@@ -20340,7 +20402,7 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       footer.append(plus,save,cancel);editor.append(footer);
       save.onclick=async()=>{
         const entries=[];for(const row of rows){const title=row.name.value.trim();if(!title)continue;const trend=row.values.value.split(/[,，\s]+/).filter(Boolean).map(Number);if(trend.some(n=>!Number.isFinite(n))){this.frame.feedback("趋势数值请使用数字");return;}entries.push({title,done:row.check.checked,trend});}
-        const date=p.clock().date,path=`${FOLDERS.quarters}/${quarterOf(date)}.md`;save.disabled=true;
+        const date=p.clock().date,path=`${FOLDERS.quarters}/${this.lower?.data?.review?.quarterId||quarterOf(date)}.md`;save.disabled=true;
         try{if(!p.app.vault.getAbstractFileByPath(path))await p.writer.create(path,"---\n---\n");await p.writer.frontmatter(path,fm=>{fm.experiments=entries;});if(this.lower?.data?.review)this.lower.data.review.quarter.experiments=entries.map(x=>[x.title,x.done,x.trend]);await p.index.load(path);p.index.emit();this.render(true);this.frame.feedback("已保存试航计划");}catch(error){save.disabled=false;this.frame.feedback("保存失败："+error.message);}
       };this.frames();
     },{capture:true});
