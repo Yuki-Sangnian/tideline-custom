@@ -10512,11 +10512,26 @@ ${d.review.wheel.map((r) => r.title + ": " + (r.value ?? "")).join("\n")}`)}</pr
     }
     return `<svg class="review-switch-frame" viewBox="0 0 ${W2} ${H2}" aria-hidden="true"><path d="M${p.map((q2) => q2.map((v2) => v2.toFixed(1)).join(",")).join("L")}Z" fill="${a2.PAPER}"/>${ink2(p, 1.3)}${ink2([[W2 / 3, 7], [W2 / 3 + 0.4, H2 - 7]], 0.5, a2.TICK)}${ink2([[W2 * 2 / 3, 7], [W2 * 2 / 3 - 0.4, H2 - 7]], 0.5, a2.TICK)}</svg>`;
   }
+  // 季度页最下面一排（航速、配舱、航海日志）里的内容放不下时：这一排自动加高，整页跟着变长（可上下滚动），风景留在最下面
+  function fitQuarter(root) {
+    root.style.removeProperty("--q-row3");
+    root.style.removeProperty("--q-extra");
+    root.removeAttribute("data-q-grow");
+    const cards = [...root.querySelectorAll(".quarter-sheet .q-trend, .quarter-sheet .q-time, .quarter-sheet .q-quote")];
+    if (!cards.length) return;
+    const have = Math.max(...cards.map((c) => c.clientHeight)), need = Math.ceil(Math.max(...cards.map((c) => c.scrollHeight))) + 10;
+    if (need > have + 1) {
+      root.setAttribute("data-q-grow", "1");
+      root.style.setProperty("--q-row3", need + "px");
+      root.style.setProperty("--q-extra", need - have + "px");
+    }
+  }
   function render() {
     const root = $5("#review"), mode2 = d.ui.reviewPeriod;
     root.dataset.period = mode2;
     root.classList.toggle("is-quarter", mode2 === "quarter");
     root.innerHTML = `<div class="review-switch">${switchFrame()}${[["day", "\u65E5"], ["week", "\u5468"], ["quarter", "\u5B63"]].map(([key, label]) => B3("review-mode", key, label, label, `aria-pressed="${key === mode2}"`)).join("")}</div>${mode2 === "quarter" ? quarterPage() : `<div class="log-book">${mode2 === "day" ? dayPage() : weekPage()}</div>`}`;
+    fitQuarter(root);
   }
   function changeScore(id, value) {
     const r = d.review.wheel.find((r2) => r2.id === id);
@@ -20600,6 +20615,13 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       box2.height = page.offsetTop + page.offsetHeight;
       box2.y = box2.top = sheet.getBoundingClientRect().top - sheet.scrollTop;
       box2.scroll = true;
+    }
+    if (box2 && this.page === "review") {
+      const page = this.root.querySelector("#review"), ex = parseFloat(page?.style.getPropertyValue("--q-extra")) || 0;
+      if (ex > 0) {
+        box2.height = Math.max(box2.height, page.offsetTop + page.offsetHeight + ex);
+        box2.scroll = true;
+      }
     }
     if (box2 && this.page === "library") {
       const sea = HOST.paper?.data?.ui?.libraryView !== "shelf" ? HOST.paper?.data?.cache?.librarySea : null, page = this.root.querySelector("#library");

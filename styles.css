@@ -4137,3 +4137,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 /* 海图视图的纸签：书名写在一行里（宽度已按最长的书名算好），万一还放不下就用省略号 */
 .compass-root #library .lib-tag .paper-title > span{display:block;white-space:nowrap;-webkit-line-clamp:unset;overflow:hidden;text-overflow:ellipsis}
+
+/* 季度页：最下面一排内容多了，这一排加高、整页变长，可以上下滚动（见 fitQuarter） */
+.compass-root #sheet:has(> #review:not([hidden]).is-quarter){max-height:calc(100cqh - 128px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.compass-root #review[data-q-grow] .quarter-sheet{bottom:auto;height:calc(100% - 84px + var(--q-extra,0px))}
+.compass-root #review[data-q-grow] .quarter-sheet .q-grid{grid-template-rows:minmax(0,1fr) minmax(0,1fr) var(--q-row3)}
+.compass-root #review[data-q-grow]::after{content:"";position:absolute;left:0;top:calc(100% + var(--q-extra,0px));width:1px;height:1px;pointer-events:none}
+@container compass (max-height: 820px){.compass-root #review[data-q-grow] .quarter-sheet{height:calc(100% - 72px + var(--q-extra,0px))}}
