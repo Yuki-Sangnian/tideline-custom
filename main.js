@@ -10297,7 +10297,7 @@ function reviewPage(a2) {
  <section class="log-sec"><h4>${icon2("sunrise")}<span>\u65F6\u95F4\u6295\u5165</span><small class="mono">${formatEffortHours(hours2)}h</small></h4><div class="log-hours-bar">${svg3(bar, 320, 12)}</div><div class="log-hours">${r.investments.map((inv, i) => `<span><i style="background:${shades[i % shades.length]}"></i>${esc2(inv.title)}<b class="mono">${formatEffortHours(inv.hours)}h</b></span>`).join("")}</div></section>
  <div class="log-notes"><section><h4>${icon2("note")}<span>\u968F\u624B\u8BB0</span></h4>${r.journal.map((n) => `<p><time class="mono">${n.time}</time>${esc2(n.text)}</p>`).join("") || '<p class="log-none">\u2014</p>'}</section></div></div>`;
     const md7 = r.date.slice(5), right = `<div class="log-left log-day-memories"><div class="log-past log-scroll log-day-history"><div class="log-page-head"><h4 class="log-past-title">\u5F80\u5E74\u4ECA\u65E5</h4><span class="log-weekday">${fmt(r.date)}</span></div>${(() => { const previous=String(Number(r.date.slice(0,4))-1)+r.date.slice(4), record=d.review.history?.[previous];return record && (record.quote || record.journal.length) ? `<article class="log-year"><div><h5>${esc2(previous)}</h5>${record.quote?`<h4>本日寄语</h4><blockquote>${esc2(record.quote)}</blockquote>`:""}${record.journal.length?`<h4>随手记</h4>${record.journal.map(note=>`<p><time class="mono">${esc2(note.time||"")}</time> ${esc2(note.text||"")}</p>`).join("")}`:""}</div></article>`:`<p class="log-none">去年今日暂无寄语和随手记</p>`;})()}</div><div class="log-day-reflections"><section><h4>${icon2("flag")}<span>\u6210\u5C31</span></h4>${r.achievements.map((t) => `<p>${esc2(t)}</p>`).join("") || '<p class="log-none">\u2014</p>'}</section><section><h4>${G3("lead")}<span>\u611F\u6069</span></h4>${r.gratitude.map((t) => `<p>${esc2(t)}</p>`).join("") || '<p class="log-none">\u2014</p>'}</section></div></div>`;
-    return left + right + `<nav class="log-day-turners" aria-label="按天翻页">${B3("review-prev", "", G3("left"), "前一天", 'class="log-day-turn log-day-turn-prev"')}${B3("review-next", "", G3("right"), "后一天", 'class="log-day-turn log-day-turn-next"')}</nav>`;
+    return left + right + `<nav class="log-day-turners" aria-label="按天翻页">${B3("review-prev", "", G3("left"), "前一天", `class="log-day-turn log-day-turn-prev"${r.date <= (d.review.firstDate || "") ? " disabled" : ""}`)}${B3("review-next", "", G3("right"), "后一天", `class="log-day-turn log-day-turn-next"${r.date >= d.clock.date ? " disabled" : ""}`)}</nav>`;
   }
   const MD = (date2) => Number(date2.slice(5, 7)) + "/" + Number(date2.slice(8)), WD3 = ["\u5468\u65E5", "\u5468\u4E00", "\u5468\u4E8C", "\u5468\u4E09", "\u5468\u56DB", "\u5468\u4E94", "\u5468\u516D"], wd = (date2) => WD3[(/* @__PURE__ */ new Date(date2 + "T12:00:00Z")).getUTCDay()];
   const score = (r) => {
@@ -10560,10 +10560,24 @@ ${d.review.wheel.map((r) => r.title + ": " + (r.value ?? "")).join("\n")}`)}</pr
     if (key === "review-mode") d.ui.reviewPeriod = id;
     else if (key === "review-prev") {
       d.ui.reviewPeriod = "day";
-      d.ui.reviewDay = Math.max(0, d.ui.reviewDay - 1);
+      // 一周的第一天再往前，就翻到前一周的最后一天；最早到你开始记日记的那一天
+      if ((d.review.days[d.ui.reviewDay]?.date || "") <= (d.review.firstDate || "")) return true;
+      if (d.ui.reviewDay > 0) d.ui.reviewDay--;
+      else if ((d.ui.reviewWeekBack || 0) < (d.review.weekBackMax || 0)) {
+        d.ui.reviewWeekBack = (d.ui.reviewWeekBack || 0) + 1;
+        d.ui.reviewDay = 6;
+        a2.reviewSelect?.();
+      }
     } else if (key === "review-next") {
       d.ui.reviewPeriod = "day";
-      d.ui.reviewDay = Math.min(6, d.ui.reviewDay + 1);
+      // 一周的最后一天再往后，就翻到后一周的第一天；最晚到今天
+      if ((d.review.days[d.ui.reviewDay]?.date || "") >= d.clock.date) return true;
+      if (d.ui.reviewDay < 6) d.ui.reviewDay++;
+      else if ((d.ui.reviewWeekBack || 0) > 0) {
+        d.ui.reviewWeekBack--;
+        d.ui.reviewDay = 0;
+        a2.reviewSelect?.();
+      }
     } else if (key === "review-week-prev" || key === "review-week-next") {
       d.ui.reviewWeekBack = Math.max(0, Math.min(d.review.weekBackMax || 0, (d.ui.reviewWeekBack || 0) + (key === "review-week-prev" ? 1 : -1)));
       a2.reviewSelect?.();
@@ -12829,7 +12843,7 @@ function reviewSlice(ix, d, date2, dayOf) {
   const qi = qIdx(date2) - quarterBack, qYear = Math.floor(qi / 4), qNo = qi % 4;
   const qDate = quarterBack ? new Date(Date.UTC(qYear, qNo * 3 + 3, 0)).toISOString().slice(0, 10) : date2, quarterId = quarterOf(qDate), quarter = ix.quarters.get(quarterId) || {};
   return {
-    weekBack, weekBackMax, quarterBack, quarterBackMax,
+    weekBack, weekBackMax, quarterBack, quarterBackMax, firstDate: first,
     weekDates,
     trend,
     days: weekDates.map(dayOf),
