@@ -4139,7 +4139,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #library .lib-tag .paper-title > span{display:block;white-space:nowrap;-webkit-line-clamp:unset;overflow:hidden;text-overflow:ellipsis}
 
 /* 季度页：最下面一排内容多了，这一排加高、整页变长，可以上下滚动（见 fitQuarter） */
-.compass-root #sheet:has(> #review:not([hidden]).is-quarter){max-height:calc(100cqh - 128px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.compass-root #sheet:has(> #review:not([hidden])[data-q-grow]){max-height:calc(100cqh - 128px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+/* 页面能滚动时，上面的「日 周 季」不能被滚动区的上边缘切掉：往下挪进来一点 */
+.compass-root #review[data-q-grow] .review-switch{top:6px}
 .compass-root #review[data-q-grow] .quarter-sheet{bottom:auto;height:calc(100% - 84px + var(--q-extra,0px))}
 .compass-root #review[data-q-grow] .quarter-sheet .q-grid{grid-template-rows:minmax(0,1fr) minmax(0,1fr) var(--q-row3)}
 .compass-root #review[data-q-grow]::after{content:"";position:absolute;left:0;top:calc(100% + var(--q-extra,0px));width:1px;height:1px;pointer-events:none}
