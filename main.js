@@ -6577,6 +6577,17 @@ function installRailOrder(view,plugin) {
   },{capture:true});
   view.registerDomEvent(modules,"dragend",()=>{dragged=null;});
 }
+// 把一个任务设为今日聚焦：同时排到它那一天的最前面，让「聚焦 = 排在最前面的任务」；返回撤销函数
+async function setTodayFocus(view,id) {
+  const lower=view.lower,model=lower?.model?.(),task=model?.tasks.find(t=>t.id===id);
+  if(!task)return null;
+  const before=model.tasks.map(t=>[t,t.focus,t.order]);
+  const peers=model.tasks.filter(t=>(t.date||null)===(task.date||null)).sort(compareDailyTasks);
+  peers.splice(peers.indexOf(task),1);peers.unshift(task);peers.forEach((t,i)=>t.order=(i+1)*10);
+  for(const t of model.tasks)t.focus=t===task?1:void 0;
+  await lower.settle();view.todayKey=null;view.render(true);
+  return async()=>{for(const [t,f,o] of before){t.focus=f;t.order=o;}await lower.settle();view.todayKey=null;view.render(true);};
+}
 function installTaskSequencing(view,plugin) {
   const root=view.root;
   let syncing=false,queued=false;
@@ -6626,6 +6637,9 @@ function installTaskSequencing(view,plugin) {
     if(!moving||!target||(moving.date||null)!==(target.date||null))return;
     const peers=model.tasks.filter(t=>t!==moving&&(t.date||null)===(target.date||null)).sort(compareDailyTasks);
     peers.splice(peers.indexOf(target)+(after?1:0),0,moving);peers.forEach((t,i)=>t.order=(i+1)*10);
+    // 今日聚焦跟着顺序走：这一天排在最前面的未完成任务就是聚焦（聚焦本来就在这一天、或还没有聚焦时才改；别的日期的聚焦不动）
+    {const live=t=>t.status!=="done"&&t.status!=="cancelled",top=peers.find(live),held=model.tasks.find(t=>t.focus&&live(t));
+      if(top&&(!held||(held.date||null)===(top.date||null)))for(const t of model.tasks)t.focus=t===top?1:void 0;}
     await lower.settle();view.todayKey=null;view.render(true);
   },{capture:true});
   view.registerDomEvent(root,"dragend",()=>{dragged=null;clearDrop();},{capture:true});
@@ -20121,7 +20135,7 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       const task = this.view.other.find((t) => t.id === d.focus);
       if (!task) return;
       const previous = [...this.plugin.index.tasks.values()].filter((t) => t.focus && t.id !== task.id);
-      const undo = await this.actions.chooseFocus(task, previous);
+      const undo = await setTodayFocus(this, task.id) || await this.actions.chooseFocus(task, previous);
       this.ui.chooseFocus = false;
       this.frame.feedback(task.title, undo);
       return;
