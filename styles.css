@@ -4128,3 +4128,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .lib-year-btn span{font-size:10px}
 /* 年份小绳结的标签：年份和本数写在一行，并让出阶段名下面那行深度范围的位置 */
 .compass-root .lib-year-btn{flex-direction:row;align-items:baseline;gap:6px}
+
+/* 读书笔记的小箭头（书签纸上、锚图标的右边）；同一周读完那一行的「+N / 收起」 */
+.compass-root #library .lib-tag .lib-notes-arrow{flex:none;width:22px;height:26px;margin-right:2px;padding:0;border:0;background:none;box-shadow:none;color:inherit;font-size:12px;line-height:26px;cursor:pointer}
+.compass-root #library .lib-tag .lib-notes-arrow:is(:hover,:focus-visible){outline:none;opacity:.7}
+.compass-root .lib-row-toggle{position:absolute;z-index:4;height:20px;padding:0 6px;border:0;background:none;box-shadow:none;font:12px/20px var(--serif);color:var(--secondary);cursor:pointer;white-space:nowrap}
+.compass-root .lib-row-toggle:is(:hover,:focus-visible){color:var(--ink);outline:none}

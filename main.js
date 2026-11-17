@@ -10920,23 +10920,27 @@ function libraryPage(a2) {
   }
   function noteBranches(L) {
     const shut = d.ui.libraryNoteShut ??= {}, x = Math.round(L.w * .75), width = Math.max(150, L.w - x - 12);
-    let out = `<div class="lib-head" style="left:${x}px">${icon2("note")}<span>读书笔记</span></div>`;
+    // 读书笔记那一块默认不显示：点书签纸上的小箭头（锚的右边）才出现，再点收起
+    const shown = L.cards.filter(c => c.kind === "book" && notesOn(c.item)), hasAny = d.books.some(b => noteLinks("book", b).length);
+    let out = shown.length || !hasAny ? `<div class="lib-head" style="left:${x}px">${icon2("note")}<span>读书笔记</span></div>` : "";
     let next = 90;
-    for (const c of L.cards.filter(c => c.kind === "book")) {
+    for (const c of shown) {
       const links = noteLinks("book", c.item);
-      if (!links.length) continue;
-      const closed = !!shut[c.item.id], y = Math.max(c.y, next), height = closed ? 34 : 38 + links.reduce((sum,l)=>sum+Math.max(38,Math.ceil(Array.from(l.label).reduce((n,c)=>n+(c.charCodeAt(0)>255?13:7),0)/Math.max(80,width-40))*19.5+10),0);
+      const closed = !!shut[c.item.id], y = Math.max(c.y, next), height = branchHeight(L.w, c.item);
       const x0 = c.x + c.w, y0 = c.y + c.h / 2;
       out += `<svg class="lib-note-wire" style="position:absolute;left:0;top:0;width:${L.w}px;height:${Math.max(L.h, y + height)}px;pointer-events:none" aria-hidden="true"><path d="M${x0} ${y0} C${x0+24} ${y0},${x-24} ${y+16},${x} ${y+16}" fill="none" stroke="currentColor" stroke-width="1"/></svg>`;
       out += `<section class="lib-note-branch hand-panel" style="position:absolute;left:${x}px;top:${y}px;width:${width}px">${B3("library-notes-toggle", c.item.id, `${closed ? "▸" : "▾"} ${esc2(c.item.title)} · ${links.length}`, (closed ? "展开" : "折叠") + "读书笔记", `class="lib-note-branch-toggle" aria-expanded="${!closed}"`)}${closed ? "" : `<ul>${links.map(l => `<li>${B3("library-note-open", encodeURIComponent(JSON.stringify([l.target,c.item.id])), esc2(l.label), "打开笔记 " + l.label, 'class="lib-note-leaf"')}</li>`).join("")}</ul>`}</section>`;
       next = y + height + 14;
     }
-    if (next === 90) out += `<p class="lib-note-empty" style="position:absolute;left:${x}px;top:100px;width:${width}px">在书籍的笔记中添加 [[笔记名]]，这里会自动显示分支。</p>`;
+    if (!hasAny) out += `<p class="lib-note-empty" style="position:absolute;left:${x}px;top:100px;width:${width}px">在书籍的笔记中添加 [[笔记名]]，这里会自动显示分支。</p>`;
     return out;
   }
-  // 每个阶段下面的纸签怎么排：在读按进度从小到大；读完按读完日期，越晚读完越靠上、越早越沉底，同一天读完的横着排成一行；其他阶段按原顺序
+  // 每个阶段下面的纸签怎么排：在读按进度从小到大；读完按读完日期，越晚读完越靠上；同一周读完的横着排成一行（越靠近绳子日期越大），这一行默认只显示最近的一本，可展开 / 收起；其他阶段按原顺序
   const foldMap = () => d.ui.libraryFold ||= { ...a2.libraryUi?.read().fold || {} };
   const yearOpenMap = () => d.ui.libraryYearOpen ||= { ...a2.libraryUi?.read().yearOpen || {} };
+  const rowOpenMap = () => d.ui.libraryRowOpen ||= { ...a2.libraryUi?.read().rowOpen || {} };
+  const notesOpenMap = () => d.ui.libraryNotesOpen ||= { ...a2.libraryUi?.read().notesOpen || {} };
+  const notesOn = (it) => !!notesOpenMap()[it.id] && noteLinks("book", it).length > 0;
   function toggleYear(key) {
     const yo = yearOpenMap(), year = Number(key.split("|")[2]), cur = key in yo ? !!yo[key] : year === 0 || year === Number(String(d.clock.date).slice(0, 4));
     yo[key] = !cur;
@@ -10948,9 +10952,28 @@ function libraryPage(a2) {
     else fold[key] = true;
     a2.libraryUi?.write({ fold: { ...fold } });
   }
+  function toggleFlag(mapOf, field, id) {
+    const m3 = mapOf();
+    if (m3[id]) delete m3[id];
+    else m3[id] = true;
+    a2.libraryUi?.write({ [field]: { ...m3 } });
+  }
+  const isoWeek = (s) => {
+    const m3 = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ""));
+    if (!m3) return "";
+    const t = new Date(Date.UTC(+m3[1], +m3[2] - 1, +m3[3])), day = (t.getUTCDay() + 6) % 7;
+    t.setUTCDate(t.getUTCDate() - day + 3);
+    const y3 = t.getUTCFullYear(), first = new Date(Date.UTC(y3, 0, 4));
+    return y3 + "-W" + String(1 + Math.round(((t - first) / 864e5 - 3 + (first.getUTCDay() + 6) % 7) / 7)).padStart(2, "0");
+  };
+  // 读书笔记那一块（右边）的高度：折叠只有标题一行，展开再加每条链接
+  function branchHeight(w2, item) {
+    const x = Math.round(w2 * 0.75), width = Math.max(150, w2 - x - 12), closed = !!(d.ui.libraryNoteShut ??= {})[item.id], links = noteLinks("book", item);
+    return closed ? 34 : 38 + links.reduce((sum, l2) => sum + Math.max(38, Math.ceil(Array.from(l2.label).reduce((n2, c) => n2 + (c.charCodeAt(0) > 255 ? 13 : 7), 0) / Math.max(80, width - 40)) * 19.5 + 10), 0);
+  }
   function seaLayout(w2, h) {
     const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
-    const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap(), yearOpen = yearOpenMap(), thisYear = Number(String(d.clock.date).slice(0, 4));
+    const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap(), yearOpen = yearOpenMap(), rowOpen = rowOpenMap(), thisYear = Number(String(d.clock.date).slice(0, 4));
     // 阶段里按年份分段：今年的直接排在阶段名下面（不挂年份小绳结），往年的各挂一个小绳结，且让出阶段名下面那行深度范围的位置
     const secLayout = (sections) => {
       let cur = 18;
@@ -10973,28 +10996,65 @@ function libraryPage(a2) {
     };
     const plan = [["literature", litX, litArea], ["book", bookX, bookArea]].map(([kind, x2, area]) => {
       const span = area[1] - area[0], cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
+      const chunk = (list2) => {
+        const out2 = [];
+        for (let i = 0; i < list2.length; i += cols) out2.push(list2.slice(i, i + cols));
+        return out2;
+      };
+      // 打开了读书笔记的书单独占一行（右边接着它的读书笔记）
+      const chunkSolo = (list2) => {
+        const out2 = [];
+        let seg = [];
+        const flush = () => {
+          out2.push(...chunk(seg));
+          seg = [];
+        };
+        for (const it of list2) {
+          if (kind === "book" && notesOn(it)) {
+            flush();
+            out2.push([it]);
+          } else seg.push(it);
+        }
+        flush();
+        return out2;
+      };
+      // 读完：同一周读完的排成一行，默认只显示最近的一本，其余收在「+N」里
+      const weekRows = (list2, prefix) => {
+        const out2 = [], seq = new Map();
+        const emit = (g2) => {
+          const n2 = seq.get(g2.week) || 0;
+          seq.set(g2.week, n2 + 1);
+          const key = prefix + "|" + g2.week + "#" + n2, open = !!rowOpen[key], many = g2.items.length > 1, lines = chunk(many && !open ? g2.items.slice(0, 1) : g2.items);
+          if (many) lines[0].toggle = { key, hidden: g2.items.length - 1, open };
+          out2.push(...lines);
+        };
+        const weeks = new Map();
+        for (const it of list2) {
+          const wk = isoWeek(it.readDate) || "-";
+          if (!weeks.has(wk)) weeks.set(wk, []);
+          weeks.get(wk).push(it);
+        }
+        // 同一周的先排在一起；打开了读书笔记的书从这一行里拿出来，在它下面单独占一行
+        for (const [wk, list3] of weeks) {
+          const rest = list3.filter((it) => !notesOn(it));
+          if (rest.length) emit({ week: wk, items: rest });
+          for (const it of list3.filter(notesOn)) emit({ week: wk, items: [it] });
+        }
+        return out2;
+      };
+      const byDateDesc = (a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || ""));
       const groups = stages[kind].map(([s]) => {
         let items = records(kind).filter((l2) => l2.stage === s);
-        const shut = !!fold[kind + "|" + s], chunk = (list2) => {
-          const out2 = [];
-          for (let i = 0; i < list2.length; i += cols) out2.push(list2.slice(i, i + cols));
-          return out2;
-        };
+        const shut = !!fold[kind + "|" + s], prefix = kind + "|" + s;
         let rows;
         if (kind === "book" && s === "reading") {
           items = items.slice().sort((a3, b3) => pct(kind, a3) - pct(kind, b3));
-          rows = chunk(items);
+          rows = chunkSolo(items);
         } else if (kind === "book" && s === "done") {
-          items = items.slice().sort((a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || "")));
-          const days = new Map();
-          for (const it of items) {
-            const day = it.readDate || "";
-            if (!days.has(day)) days.set(day, []);
-            days.get(day).push(it);
-          }
-          rows = [...days.values()].flatMap(chunk);
-        } else rows = chunk(items);
-        // 「读完」「已泛读」「已精读」里有往年读完的：按年份分成小绳结，每年可以折叠 / 展开（今年默认展开，往年默认折叠）
+          items = items.slice().sort(byDateDesc);
+          rows = weekRows(items, prefix);
+        } else rows = kind === "book" ? chunkSolo(items) : chunk(items);
+        // 「读完」「已泛读」「已精读」里有往年读完的：往年的按年份挂小绳结，每年可以折叠 / 展开（往年默认折叠）
         let sections = null;
         const yearStage = kind === "book" && s === "done" || kind === "literature" && (s === "skimmed" || s === "deep-done");
         if (yearStage && !shut && items.some((it) => yearOf(it) && yearOf(it) !== thisYear)) {
@@ -11005,17 +11065,8 @@ function libraryPage(a2) {
             byYear.get(y3).push(it);
           }
           sections = [...byYear.keys()].sort((a3, b3) => (a3 === 0) - (b3 === 0) || b3 - a3).map((y3) => {
-            const list2 = byYear.get(y3).slice().sort((a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || ""))), key = kind + "|" + s + "|" + y3, open = key in yearOpen ? !!yearOpen[key] : y3 === 0 || y3 === thisYear;
-            let rws;
-            if (kind === "book") {
-              const days = new Map();
-              for (const it of list2) {
-                const day = it.readDate || "";
-                if (!days.has(day)) days.set(day, []);
-                days.get(day).push(it);
-              }
-              rws = [...days.values()].flatMap(chunk);
-            } else rws = chunk(list2);
+            const list2 = byYear.get(y3).slice().sort(byDateDesc), key = prefix + "|" + y3, open = key in yearOpen ? !!yearOpen[key] : y3 === 0 || y3 === thisYear;
+            const rws = kind === "book" ? weekRows(list2, prefix) : chunk(list2);
             return { year: y3, key, head: y3 !== thisYear, label: y3 ? String(y3) : "未记日期", count: list2.length, open, rows: open ? rws : [] };
           });
         }
@@ -11025,32 +11076,47 @@ function libraryPage(a2) {
       return { kind, x2, area, cols, cw, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
     });
     // 内容多到放不下时，整页往下加长（绳子也跟着变长）；少了再缩回来
-    const H = Math.max(h, y0 + Math.max(...plan.map((p) => p.total)) + 104), y1 = H - 104;
-    const out = { w: w2, h: H, H, litX, bookX, y0, y1, ch, cards: [], levels: [], years: [], detail: detail2, drift: [] };
-    for (const { kind, x2, area, cols, cw, groups, need, total } of plan) {
-      const n = stages[kind].length, step = (y1 - y0) / n, extra = Math.max(0, y1 - y0 - total), steps = need.every((v2) => v2 <= step) ? need.map(() => step) : need.map((v2) => v2 + extra / n);
-      let yy = y0;
-      stages[kind].forEach(([stage2, label, depth], level) => {
-        const y2 = Math.round(yy), step2 = steps[level], g2 = groups[level];
-        yy += step2;
-        out.levels.push({ kind, stage: stage2, label, depth, x: x2, y: y2, step: step2, area, shut: g2.shut, count: g2.count });
-        g2.rows.forEach((row, r) => row.forEach((item, col) => {
-          out.cards.push({ kind, item, col, row: r, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: y2 + 18 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
-        }));
-        if (g2.sections) for (const { sec, sy, top } of secLayout(g2.sections).pos) {
-          if (sy != null) out.years.push({ kind, stage: stage2, year: sec.year, key: sec.key, label: sec.label, count: sec.count, open: sec.open, x: x2, y: y2 + sy });
-          sec.rows.forEach((row, r) => row.forEach((item, col) => {
-            out.cards.push({ kind, item, col, row: r, sec: sec.key, sy: sy != null ? y2 + sy : void 0, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: y2 + top + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
-          }));
-        }
-      });
-    }
-    d.literature.filter((l2) => l2.stage === "dropped").forEach((item, i2) => out.drift.push({ kind: "literature", item, x: litX + 30 + i2 * 174, y: H - 74, w: 150, h: 34, rot: i2 % 2 ? 4 : -5 }));
+    const place = (H) => {
+      const y1 = H - 104, out = { w: w2, h: H, H, litX, bookX, y0, y1, ch, cards: [], levels: [], years: [], toggles: [], detail: detail2, drift: [] };
+      for (const { kind, x2, area, cols, cw, groups, need, total } of plan) {
+        const n = stages[kind].length, step = (y1 - y0) / n, extra = Math.max(0, y1 - y0 - total), steps = need.every((v2) => v2 <= step) ? need.map(() => step) : need.map((v2) => v2 + extra / n);
+        let yy = y0;
+        stages[kind].forEach(([stage2, label, depth], level) => {
+          const y2 = Math.round(yy), step2 = steps[level], g2 = groups[level];
+          yy += step2;
+          out.levels.push({ kind, stage: stage2, label, depth, x: x2, y: y2, step: step2, area, shut: g2.shut, count: g2.count });
+          const putRows = (rowsList, top, sec, sy) => rowsList.forEach((row, r) => {
+            const ry = top + r * (ch + gap), dx = r % 2 && cols > 1 ? 10 : 0;
+            row.forEach((item, col) => out.cards.push({ kind, item, col, row: r, sec, sy, x: area[0] + col * (cw + 14) + dx, y: ry, w: cw, h: ch, ky: y2, rx: x2 }));
+            if (row.toggle) out.toggles.push({ kind, stage: stage2, ...row.toggle, x: area[0] + (row.length - 1) * (cw + 14) + dx + cw + 8, y: ry + ch / 2 - 10 });
+          });
+          putRows(g2.rows, y2 + 18);
+          if (g2.sections) for (const { sec, sy, top } of secLayout(g2.sections).pos) {
+            if (sy != null) out.years.push({ kind, stage: stage2, year: sec.year, key: sec.key, label: sec.label, count: sec.count, open: sec.open, x: x2, y: y2 + sy });
+            putRows(sec.rows, y2 + top, sec.key, sy != null ? y2 + sy : void 0);
+          }
+        });
+      }
+      d.literature.filter((l2) => l2.stage === "dropped").forEach((item, i2) => out.drift.push({ kind: "literature", item, x: litX + 30 + i2 * 174, y: H - 74, w: 150, h: 34, rot: i2 % 2 ? 4 : -5 }));
+      return out;
+    };
+    const notesBottom = (L) => {
+      let next = 90, bottom = 0;
+      for (const c of L.cards.filter((c2) => c2.kind === "book" && notesOn(c2.item))) {
+        const y2 = Math.max(c.y, next), hh = branchHeight(L.w, c.item);
+        next = y2 + hh + 14;
+        bottom = Math.max(bottom, y2 + hh);
+      }
+      return bottom;
+    };
+    let out = place(Math.max(h, y0 + Math.max(...plan.map((p) => p.total)) + 104));
+    const nb = notesBottom(out);
+    if (nb + 56 > out.H) out = place(nb + 56);
     return out;
   }
   function tag(c, cls = "") {
     const { kind, item } = c, active = !d.ui.libraryFilter || item.projectIds.includes(d.ui.libraryFilter), sel = d.ui.librarySelected?.id === item.id, linked = item.projectIds.length, done2 = ["deep-done", "done"].includes(item.stage);
-    return `<div class="library-sign lib-tag hand-panel ${cls} ${linked ? "" : "unlinked"} ${active ? "" : "unrelated"} ${matches(kind, item) ? "" : "is-unmatched"} ${sel ? "is-selected" : ""}" draggable="true" data-p2-drag="paper" data-id="${kind}|${item.id}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px${c.rot ? `;transform:rotate(${c.rot}deg)` : ""}">${B3("library-open", kind + "|" + item.id, `<span>${esc2(item.title)}</span>${done2 && item.readDate ? `<time class="mono">${fmtDay(item.readDate)}</time>` : ""}`, "\u6253\u5F00 " + item.title, `class="paper-title" data-paper-hover="${kind}|${item.id}" aria-describedby="library-gloss"`)}${linked ? B3("library-project-filter", item.projectIds[0], G3("anchor"), "\u7B5B\u9009\u9879\u76EE " + a2.project(item.projectIds[0]).title, 'class="paper-project-mark"') : ""}</div>`;
+    return `<div class="library-sign lib-tag hand-panel ${cls} ${linked ? "" : "unlinked"} ${active ? "" : "unrelated"} ${matches(kind, item) ? "" : "is-unmatched"} ${sel ? "is-selected" : ""}" draggable="true" data-p2-drag="paper" data-id="${kind}|${item.id}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px${c.rot ? `;transform:rotate(${c.rot}deg)` : ""}">${B3("library-open", kind + "|" + item.id, `<span>${esc2(item.title)}</span>${done2 && item.readDate ? `<time class="mono">${fmtDay(item.readDate)}</time>` : ""}`, "\u6253\u5F00 " + item.title, `class="paper-title" data-paper-hover="${kind}|${item.id}" aria-describedby="library-gloss"`)}${linked ? B3("library-project-filter", item.projectIds[0], G3("anchor"), "\u7B5B\u9009\u9879\u76EE " + a2.project(item.projectIds[0]).title, 'class="paper-project-mark"') : ""}${kind === "book" && noteLinks(kind, item).length ? B3("library-notes-show", item.id, notesOpenMap()[item.id] ? "▾" : "▸", (notesOpenMap()[item.id] ? "隐藏" : "显示") + "读书笔记", `class="lib-notes-arrow" aria-expanded="${!!notesOpenMap()[item.id]}"`) : ""}</div>`;
   }
   function toolbar() {
     const f = d.ui.libraryFilter;
@@ -11108,6 +11174,7 @@ ${item.conclusion}`)}</pre>` : ""}
       html += B3("library-fold", v2.kind + "|" + v2.stage, `<b>${v2.label}<i class="lib-fold-mark">${v2.shut ? "▸" : "▾"}</i></b><span class="mono">${v2.shut ? v2.count + " 项 · " : ""}${v2.depth}</span>`, (v2.shut ? "展开" : "折叠") + v2.label, `class="lib-depth lib-depth-btn" aria-expanded="${!v2.shut}" style="left:${v2.x - 18}px;top:${v2.y - 10}px"`) + B3("library-knot", v2.kind + "|" + stages[v2.kind].findIndex((s) => s[0] === v2.stage), svg3(circle2(9, 9, 5, 1.3), 18), v2.label, `class="library-knot" data-knot-hover="${v2.kind}|${stages[v2.kind].findIndex((s) => s[0] === v2.stage)}" style="left:${v2.x - 9}px;top:${v2.y - 9}px"`);
     }
     for (const yv of L3.years) html += B3("library-year", yv.key, `<b>${esc2(yv.label)}<i class="lib-fold-mark">${yv.open ? "▾" : "▸"}</i></b><span class="mono">${yv.count} ${yv.kind === "book" ? "本" : "篇"}</span>`, (yv.open ? "折叠" : "展开") + yv.label + (yv.year ? "年" : ""), `class="lib-depth lib-year-btn" aria-expanded="${yv.open}" style="left:${yv.x - 14}px;top:${yv.y - 9}px"`);
+    for (const t of L3.toggles) html += B3("library-row", t.key, t.open ? "收起 ◂" : `+${t.hidden} ▸`, t.open ? "收起这一周" : "展开这一周其余 " + t.hidden + " 本", `class="lib-row-toggle" aria-expanded="${t.open}" style="left:${t.x}px;top:${t.y}px"`);
     html += L3.cards.map((c) => tag(c)).join("") + L3.drift.map((c) => tag(c, "drifted")).join("") + noteBranches(L3);
     if (L3.drift.length) html += `<span class="lib-drift-note" style="left:${L3.drift.at(-1).x + L3.drift.at(-1).w + 16}px;top:${L3.H - 62}px">\u6C89\u5E95 \xB7 \u5DF2\u653E\u5F03</span>`;
     html += "</div>" + toolbar();
@@ -11361,6 +11428,10 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     } else if (key === "library-pdf") {
       a2.openPDF?.(d.ui.librarySelected?.id);
       return true;
+    } else if (key === "library-notes-show") {
+      toggleFlag(notesOpenMap, "notesOpen", id);
+    } else if (key === "library-row") {
+      toggleFlag(rowOpenMap, "rowOpen", id);
     } else if (key === "library-year") {
       toggleYear(id);
     } else if (key === "library-fold") {
