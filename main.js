@@ -5596,8 +5596,14 @@ function tagItems(stats, q2) {
   if (q2 && !stats.has(q2)) out.push({ insert: "#" + q2, label: "新建标签 · " + q2 });
   return out;
 }
-function bindSuggestPopup(view, input, { items, pick }) {
+// opts.token(input)：取光标处正在输入的那个词（不写就按 # / @ 取）；opts.after：选中后接在词后面的字（默认一个空格）；opts.manual：不预先选中第一项，回车就是照打的内容走，要用方向键 / Tab / 点击才选候选
+function bindSuggestPopup(view, input, { items, pick, token: tokenOf, after = " ", manual = false }) {
   let st = null, box = null, ime = false;
+  const listeners = [];
+  const on = (target, type, fn, opts) => {
+    target.addEventListener(type, fn, opts);
+    listeners.push([target, type, fn, opts]);
+  };
   const close = () => {
     st = null;
     box?.remove();
@@ -5629,26 +5635,27 @@ function bindSuggestPopup(view, input, { items, pick }) {
     const frame = box.querySelector(":scope > .hand-popup-frame");
     box.innerHTML = st.items.map((s, i) => `<button type="button" role="option" id="tl-suggest-${i}" data-tl-pick="${i}" aria-selected="${i === st.index}">${esc(s.label)}</button>`).join("");
     if (frame) box.prepend(frame);
-    input.setAttribute("aria-activedescendant", "tl-suggest-" + st.index);
+    if (st.index >= 0) input.setAttribute("aria-activedescendant", "tl-suggest-" + st.index);
+    else input.removeAttribute("aria-activedescendant");
     place();
     view.frames();
     box.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   };
   const update = () => {
     if (ime) return;
-    const token = activeToken(input.value, input.selectionStart ?? input.value.length), list2 = token ? items(token) || [] : [];
+    const token = tokenOf ? tokenOf(input) : activeToken(input.value, input.selectionStart ?? input.value.length), list2 = token ? items(token) || [] : [];
     if (!list2.length) {
       close();
       return;
     }
     const same = st && st.token.sign === token.sign && st.token.query === token.query;
-    st = { token, items: list2, index: same ? Math.min(st.index, list2.length - 1) : 0 };
+    st = { token, items: list2, index: same ? Math.min(st.index, list2.length - 1) : manual ? -1 : 0 };
     paint();
   };
   const choose = (i) => {
     const s = st?.items[i];
     if (!s) return;
-    const { token } = st, v2 = input.value, ins = s.insert + " ";
+    const { token } = st, v2 = input.value, ins = s.insert + after;
     input.value = v2.slice(0, token.start) + ins + v2.slice(token.end).replace(/^[ \t]+/, "");
     const pos = token.start + ins.length;
     input.setSelectionRange(pos, pos);
@@ -5661,51 +5668,58 @@ function bindSuggestPopup(view, input, { items, pick }) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.focus();
   };
-  view.registerDomEvent(document, "keydown", (e) => {
+  on(document, "keydown", (e) => {
     if (e.target !== input || !st || e.isComposing || e.keyCode === 229) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       e.stopImmediatePropagation();
-      st.index = (st.index + (e.key === "ArrowDown" ? 1 : -1) + st.items.length) % st.items.length;
+      const n2 = st.items.length;
+      st.index = st.index < 0 ? e.key === "ArrowDown" ? 0 : n2 - 1 : (st.index + (e.key === "ArrowDown" ? 1 : -1) + n2) % n2;
       paint();
-    } else if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+    } else if (e.key === "Enter" && !e.shiftKey || e.key === "Tab") {
       const s = st.items[st.index];
-      if (e.key === "Enter" && s && s.insert === input.value.slice(st.token.start, st.token.end)) {
+      if (e.key === "Enter" && (!s || s.insert === input.value.slice(st.token.start, st.token.end))) {
         close();
         return;
       }
       e.preventDefault();
       e.stopImmediatePropagation();
-      choose(st.index);
+      choose(Math.max(0, st.index));
     } else if (e.key === "Escape") {
       e.preventDefault();
       e.stopImmediatePropagation();
       close();
     }
   }, true);
-  view.registerDomEvent(input, "input", update);
-  view.registerDomEvent(input, "click", update);
-  view.registerDomEvent(input, "keyup", (e) => {
+  on(input, "input", update);
+  on(input, "click", update);
+  on(input, "keyup", (e) => {
     if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) update();
   });
-  view.registerDomEvent(input, "compositionstart", () => {
+  on(input, "compositionstart", () => {
     ime = true;
   });
-  view.registerDomEvent(input, "compositionend", () => {
+  on(input, "compositionend", () => {
     ime = false;
     update();
   });
-  view.registerDomEvent(input, "blur", () => setTimeout(() => {
+  on(input, "blur", () => setTimeout(() => {
     if (document.activeElement !== input) close();
   }, 150));
-  view.registerDomEvent(view.root, "mousedown", (e) => {
+  on(view.root, "mousedown", (e) => {
     const b3 = e.target.closest?.("[data-tl-pick]");
     if (!b3 || !box?.contains(b3)) return;
     e.preventDefault();
     e.stopPropagation();
     choose(+b3.dataset.tlPick);
   }, true);
-  return { close, update };
+  const destroy = () => {
+    close();
+    for (const [target, type, fn, opts] of listeners) target.removeEventListener(type, fn, opts);
+    listeners.length = 0;
+  };
+  view.register?.(destroy);
+  return { close, update, destroy };
 }
 
 // src/ui/day-text.js
@@ -11445,6 +11459,30 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     paintReading(root);
   }
   // 笔记输入框下面的 B / I / 列表 / 链接：给选中的文字加格式（没选中就在光标处插入），光标和选区不会丢
+  // 写关键词 / 标签时，边打字边列出知识库里已有的（避免同一个词写成不一样的）：按 ↓ / Tab / 点击选一个，不选就照你打的写；回车仍然是保存
+  const keywordStats = () => {
+    const c = new Map();
+    for (const [kind, list2] of [["literature", d.literature], ["book", d.books]]) for (const it of list2) for (const k2 of meta(kind, it).keywords || []) c.set(k2, (c.get(k2) || 0) + 1);
+    return c;
+  };
+  const keywordItems = (token) => {
+    const q3 = token.query.trim().toLowerCase(), sel = d.ui.librarySelected, own = new Set(sel ? meta(sel.kind, find(sel.kind, sel.id))?.keywords || [] : []);
+    return [...keywordStats()].filter(([k2]) => !own.has(k2) && k2.toLowerCase().includes(q3)).sort((x3, y3) => y3[1] - x3[1] || x3[0].localeCompare(y3[0], "zh-Hans")).slice(0, 8).map(([k2, n2]) => ({ insert: k2, label: k2 + (n2 > 1 ? " (" + n2 + ")" : "") }));
+  };
+  let kwBound = null;
+  HOST.addEventListener("focusin", (e) => {
+    const el = e.target, single = el.matches?.('.lib-tag-form input[name="tag"]'), multi = el.matches?.('[data-p2-form="library-field"][data-field="keywords"] textarea');
+    if (!(single || multi) || kwBound?.el === el || !a2.appView) return;
+    kwBound?.handle.destroy();
+    const token = single ? (inp) => inp.value.trim() ? { sign: "", query: inp.value, start: 0, end: inp.value.length } : null : (inp) => {
+      const v3 = inp.value, caret = inp.selectionStart ?? v3.length;
+      let at2 = caret;
+      while (at2 > 0 && !/[,，、;；\n]/.test(v3[at2 - 1])) at2--;
+      const raw = v3.slice(at2, caret), lead = raw.length - raw.trimStart().length;
+      return raw.trim() ? { sign: "", query: raw.trim(), start: at2 + lead, end: caret } : null;
+    };
+    kwBound = { el, handle: bindSuggestPopup(a2.appView, el, { items: keywordItems, token, after: single ? "" : "、", manual: true }) };
+  });
   HOST.addEventListener("mousedown",e=>{if(e.target.closest?.("[data-lib-fmt]"))e.preventDefault();});
   HOST.addEventListener("click",e=>{
     const btn=e.target.closest?.("[data-lib-fmt]");if(!btn)return;
@@ -13481,6 +13519,7 @@ function createLower(view) {
     navigate: (page2) => view.go(page2),
     drawScenery: () => view.drawScenery(),
     announce: (msg, undo) => view.frame.feedback(msg, undo),
+    appView: view,
     // 复盘页翻到别的周 / 别的季之后，重新取那一周 / 那一季的数据
     reviewSelect: () => view.lower?.reviewSelect?.(),
     // 知识库里「折叠了哪些阶段」这类界面状态：存在这台设备上，下次打开还是这样
