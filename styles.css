@@ -4100,3 +4100,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-2,.HyperMD-header-2,h2){font-size:17px!important;line-height:1.5!important}
 .compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-3,.HyperMD-header-3,h3){font-size:16px!important;line-height:1.5!important}
 .compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-4,.cm-header-5,.cm-header-6,.HyperMD-header-4,.HyperMD-header-5,.HyperMD-header-6,h4,h5,h6){font-size:15px!important;line-height:1.5!important}
+
+/* 书架页：右边一列放不下时整排加长（见 fitShelf），最多拉到离底边 10px */
+.compass-root #library .lib-shelf{bottom:max(10px,calc(108px - var(--lib-extra,0px)))}

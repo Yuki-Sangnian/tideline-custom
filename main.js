@@ -10969,6 +10969,15 @@ ${item.conclusion}`)}</pre>` : ""}
     b3.textContent = foldLabel(open);
     b3.setAttribute("aria-expanded", String(open));
   });
+  // 书架页：右边一列（阅读进度、标签、读书笔记……）放不下时，把整排（左中右同高）往下加长，直到右列完整显示
+  function fitShelf(root) {
+    if (!root.isConnected) return;
+    root.style.removeProperty("--lib-extra");
+    const side = root.querySelector(".lib-shelf .lib-side");
+    if (!side) return;
+    const need = Math.ceil(side.scrollHeight - side.clientHeight);
+    if (need > 1) root.style.setProperty("--lib-extra", need + 4 + "px");
+  }
   function paintReading(root) {
     readingComponent?.unload();
     readingComponent = null;
@@ -11041,6 +11050,8 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     if(editor)editor.dataset.initial=fieldSnapshot(editor);
     searchResults();
     paintReading(root);
+    requestAnimationFrame(() => fitShelf(root));
+    setTimeout(() => fitShelf(root), 250);
   }
   // 笔记输入框下面的 B / I / 列表 / 链接：给选中的文字加格式（没选中就在光标处插入），光标和选区不会丢
   HOST.addEventListener("mousedown",e=>{if(e.target.closest?.("[data-lib-fmt]"))e.preventDefault();});
