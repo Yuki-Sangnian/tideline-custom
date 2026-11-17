@@ -5476,6 +5476,107 @@ function suggestions(token, d) {
   return all;
 }
 
+// 知识库「打开文献 / 打开书籍」：笔记关联的文件可以是 PDF、Word、MD；没找到时询问是关联已有文件、新建 Word 还是新建 MD 笔记
+function crc32(bytes) {
+  let c, crc = -1;
+  crc32.table ||= Array.from({ length: 256 }, (_2, n) => {
+    c = n;
+    for (let k2 = 0; k2 < 8; k2++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    return c >>> 0;
+  });
+  for (let i = 0; i < bytes.length; i++) crc = crc32.table[(crc ^ bytes[i]) & 255] ^ crc >>> 8;
+  return (crc ^ -1) >>> 0;
+}
+function makeDocx(title) {
+  const enc = new TextEncoder(), xml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const files = [
+    ["[Content_Types].xml", head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+    ["_rels/.rels", head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    ["word/document.xml", head + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>' + xml(title) + '</w:t></w:r></w:p><w:p/></w:body></w:document>']
+  ].map(([name, text]) => ({ name: enc.encode(name), data: enc.encode(text) }));
+  const parts = [], central = [];
+  let offset = 0;
+  const u16 = (v2) => [v2 & 255, v2 >> 8 & 255], u32 = (v2) => [v2 & 255, v2 >> 8 & 255, v2 >> 16 & 255, v2 >>> 24 & 255];
+  for (const f of files) {
+    const crc = crc32(f.data), local = Uint8Array.from([...u32(67324752), ...u16(20), ...u16(2048), ...u16(0), ...u16(0), ...u16(33), ...u32(crc), ...u32(f.data.length), ...u32(f.data.length), ...u16(f.name.length), ...u16(0)]);
+    parts.push(local, f.name, f.data);
+    central.push(Uint8Array.from([...u32(33639248), ...u16(20), ...u16(20), ...u16(2048), ...u16(0), ...u16(0), ...u16(33), ...u32(crc), ...u32(f.data.length), ...u32(f.data.length), ...u16(f.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)]), f.name);
+    offset += local.length + f.name.length + f.data.length;
+  }
+  const size = central.reduce((n, a2) => n + a2.length, 0), end = Uint8Array.from([...u32(101010256), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(size), ...u32(offset), ...u16(0)]);
+  const all = [...parts, ...central, end], out = new Uint8Array(all.reduce((n, a2) => n + a2.length, 0));
+  let at2 = 0;
+  for (const a2 of all) {
+    out.set(a2, at2);
+    at2 += a2.length;
+  }
+  return out;
+}
+function libraryFileFlow({ plugin, view, path, kind, title }) {
+  const app = plugin.app, O = import_obsidian7, book = kind === "book";
+  const safe = String(title || path.split("/").pop().replace(/\.md$/, "")).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim() || (book ? "书籍" : "文献"), folder = "附件";
+  const fail = (e) => view.frame.feedback("操作失败：" + (e?.message || e));
+  const finish = async (file, msg) => {
+    const text = app.metadataCache.fileToLinktext(file, path, false);
+    await plugin.writer.frontmatter(path, (fm) => {
+      fm.file = "[[" + text + "]]";
+    });
+    plugin.writer.openAttachment(file);
+    view.frame.feedback(msg);
+  };
+  const unique = (name, ext) => {
+    let p = folder + "/" + name + "." + ext, n = 2;
+    while (app.vault.getAbstractFileByPath(p)) p = folder + "/" + name + " " + n++ + "." + ext;
+    return p;
+  };
+  const ensureFolder = async () => {
+    if (!app.vault.getAbstractFileByPath(folder)) await app.vault.createFolder(folder);
+  };
+  const modal = new O.Modal(app);
+  modal.titleEl.setText("没有找到这" + (book ? "本书" : "篇文献") + "的文件");
+  const box = modal.contentEl;
+  box.createEl("p", { text: "这条笔记还没有关联 PDF、Word 或 MD 文件。要怎么办？" });
+  const col = box.createDiv();
+  col.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:12px";
+  const choice = (label, hint, run, cta) => {
+    const b3 = col.createEl("button", { text: label });
+    if (cta) b3.addClass("mod-cta");
+    b3.title = hint;
+    b3.addEventListener("click", () => {
+      modal.close();
+      Promise.resolve().then(run).catch(fail);
+    });
+  };
+  choice("关联已有文件（PDF / Word / MD）", "从知识库里选一个已有的文件", () => {
+    class Picker extends O.FuzzySuggestModal {
+      getItems() {
+        return app.vault.getFiles().filter((f) => ["pdf", "docx", "doc", "md"].includes(f.extension.toLowerCase()) && f.path !== path);
+      }
+      getItemText(f) {
+        return f.path;
+      }
+      onChooseItem(f) {
+        finish(f, "已关联：" + f.name).catch(fail);
+      }
+    }
+    const p = new Picker(app);
+    p.setPlaceholder("搜索知识库里的 PDF、Word 或 MD 文件…");
+    p.open();
+  }, true);
+  choice("新建 Word 文件", "在「附件」文件夹里新建一个 .docx 并用 Word 打开", async () => {
+    await ensureFolder();
+    const bytes = makeDocx(safe), file = await app.vault.createBinary(unique(safe, "docx"), bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    await finish(file, "已新建 Word 文件");
+  });
+  choice("新建 MD 笔记", "在「附件」文件夹里新建一篇 Markdown 笔记", async () => {
+    await ensureFolder();
+    const file = await app.vault.create(unique(safe + " 笔记", "md"), "# " + safe + "\n\n");
+    await finish(file, "已新建 MD 笔记");
+  });
+  modal.open();
+}
+
 // 输入框里敲 # 或 @ 时弹出已有的标签 / 人物：上下键选、回车或点击插入；不选就照输入的内容新建
 function tagItems(stats, q2) {
   const low = (q2 || "").toLowerCase(), all = [...stats].filter(([t]) => t && !/\s/.test(t) && (!low || t.toLowerCase().includes(low)));
@@ -7429,17 +7530,19 @@ function createMore(root) {
     }
   }
   function cut(e, top, bottom) {
+    const soft = e.classList.contains("lib-record-body");
     let y2 = Infinity;
     const take = (t) => {
       if (t > top + 16) y2 = Math.min(y2, t);
     };
-    for (const i of e.querySelectorAll(ITEM)) {
+    for (const i of soft ? [] : e.querySelectorAll(ITEM)) {
       const b3 = i.getBoundingClientRect();
       if (b3.top > bottom + 2) break;
       if (b3.height && b3.height <= 80 && b3.top < bottom - 2 && b3.bottom > bottom + 2) take(b3.top);
     }
     const range = document.createRange();
     walkVisible(e, (n) => {
+      if (soft) return;
       range.selectNodeContents(n);
       for (const r of range.getClientRects()) if (r.top < bottom - 1 && r.bottom > bottom - 8) {
         const item = n.parentElement.closest(ITEM), b3 = item && e.contains(item) ? item.getBoundingClientRect() : null;
@@ -10988,7 +11091,7 @@ ${item.conclusion}`)}</pre>` : ""}
     const m2 = meta(kind, item), sub = d.ui.librarySub || "abstract", links2 = item.projectIds.map((id) => a2.project(id));
     const entryLabel={abstract:"关键信息",note:"我的笔记",marks:"我的标注",related:"相关内容"}[sub]||"我的笔记";
     const body = sub === "abstract" ? `<h4>\u6458\u8981</h4>${readingBox("abstract", m2.abstract, item.id)}<h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li data-lib-pt="${i}">${[icon2("note"), G3("goal"), icon2("route")][i%3]}<div class="lib-point"><span class="lib-point-text"><b>${esc2(k2)}</b>${esc2(v2)}</span></div></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2, i3) => `<li>${readingBox("mark" + i3, x2, item.id)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes ? readingBox("related", m2.relatedNotes, item.id) : ""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`${m2.note ? readingBox("note", m2.note, item.id) : '<p class="lib-abstract"><span class="lib-none">还没有笔记。</span></p>'}`}`;
-    return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${inlineField("title", item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>\u6253\u5F00 PDF</span>`, "\u6253\u5F00 PDF", 'class="lib-pdf"')}</div></header>
+    return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${inlineField("title", item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>${kind === "book" ? "打开书籍" : "打开文献"}</span>`, kind === "book" ? "打开书籍" : "打开文献", 'class="lib-pdf"')}</div></header>
  <div class="lib-tags">${m2.keywords.map((k2) => `<span class="lib-chip hand-pill">${esc2(k2)}</span>`).join("")}</div>
  <div class="lib-subtabs" role="tablist">${[["abstract", "\u6458\u8981"], ["note", "\u7B14\u8BB0"], ["marks", `\u6807\u6CE8 (${m2.marks.length})`], ["related", `\u76F8\u5173 (${related(kind, item).length+(m2.relatedNotes||"").split(/\n+/).filter(Boolean).length})`]].map(([k2, l2]) => B3("library-sub", k2, l2, l2, `role="tab" aria-selected="${sub === k2}"`)).join("")}</div>
  <div class="lib-record-body">${body}${d.ui.librarySource ? `<pre class="markdown-preview">${esc2(`---
@@ -13039,7 +13142,8 @@ function createLower(view) {
         view.frame.feedback("\u5DF2\u5728 Zotero \u91CC\u6253\u5F00");
         return;
       }
-      view.frame.feedback("\u8FD9\u7BC7\u7B14\u8BB0\u6CA1\u6709\u94FE\u63A5\u5230\u4ED3\u5E93\u4E2D\u7684 PDF");
+      const ix = plugin.index, rec = ix.books.get(path) || ix.literature.get(path);
+      libraryFileFlow({ plugin, view, path, kind: ix.books.has(path) ? "book" : "literature", title: rec?.title });
     },
     newProject: (title, ideaId) => p2?.newProject(title, ideaId),
     // 项目页里点里程碑下的任务：完成 / 重新打开（原型 paper.js 的 complete）
@@ -20671,6 +20775,12 @@ function obsidianWriter(app) {
       const f = get(path);
       if (f) app.workspace.getLeaf("tab").openFile(f);
     },
+    // 打开文献 / 书籍的文件：属性「file」里关联的任何文件，或笔记里链接的 PDF、Word
+    openAttachment(file) {
+      const ext = String(file.extension || "").toLowerCase();
+      if (["pdf", "md"].includes(ext) || typeof app.openWithDefaultApp !== "function") app.workspace.getLeaf("tab").openFile(file);
+      else app.openWithDefaultApp(file.path);
+    },
     openPDF(path) {
       const note = get(path);
       if (!(note instanceof import_obsidian4.TFile)) return false;
@@ -20678,8 +20788,10 @@ function obsidianWriter(app) {
       const links2 = [...cache?.frontmatterLinks || [], ...cache?.links || [], ...cache?.embeds || []];
       for (const link2 of links2) {
         const target = app.metadataCache.getFirstLinkpathDest(link2.link.split("#")[0], path);
-        if (target?.extension.toLowerCase() !== "pdf") continue;
-        app.workspace.getLeaf("tab").openFile(target);
+        if (!target) continue;
+        const ext = target.extension.toLowerCase(), prop = String(link2.key || "").split(".")[0] === "file";
+        if (!(["pdf", "docx", "doc"].includes(ext) || prop && ext)) continue;
+        this.openAttachment(target);
         return true;
       }
       return false;

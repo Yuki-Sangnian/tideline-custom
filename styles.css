@@ -4112,3 +4112,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #library :is(.lib-card,.lib-record) h3 .lib-inline-value{cursor:text;text-align:left;display:inline;font:inherit}
 .compass-root #library :is(.lib-card,.lib-record) h3 .lib-inline-value:is(:hover,:focus-visible){text-decoration:underline dotted;text-underline-offset:5px;outline:none}
 .compass-root #library :is(.lib-card,.lib-record) h3 .lib-inline-editor{margin:0}
+
+/* 知识库详情的正文区：不整条丢掉压在横线上的内容，而是靠近横线的那一行字渐渐变淡，到横线以下完全消失 */
+.compass-root .lib-record-body[data-r33-more="true"]{-webkit-mask-image:linear-gradient(#000 calc(var(--r34-cut,100%) - 34px),transparent var(--r34-cut,100%));mask-image:linear-gradient(#000 calc(var(--r34-cut,100%) - 34px),transparent var(--r34-cut,100%))}
