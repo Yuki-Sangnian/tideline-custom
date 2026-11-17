@@ -10921,25 +10921,61 @@ function libraryPage(a2) {
     if (next === 90) out += `<p class="lib-note-empty" style="position:absolute;left:${x}px;top:100px;width:${width}px">在书籍的笔记中添加 [[笔记名]]，这里会自动显示分支。</p>`;
     return out;
   }
+  // 每个阶段下面的纸签怎么排：在读按进度从小到大；读完按读完日期，越晚读完越靠上、越早越沉底，同一天读完的横着排成一行；其他阶段按原顺序
+  const foldMap = () => d.ui.libraryFold ||= { ...a2.libraryUi?.read().fold || {} };
+  function toggleFold(kind, stage2) {
+    const fold = foldMap(), key = kind + "|" + stage2;
+    if (fold[key]) delete fold[key];
+    else fold[key] = true;
+    a2.libraryUi?.write({ fold: { ...fold } });
+  }
   function seaLayout(w2, h) {
-    const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, y1 = h - 104, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
-    const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)];
-    const out = { w: w2, h, litX, bookX, y0, y1, ch, cards: [], levels: [], detail: detail2, drift: [] };
-    for (const [kind, x2, area] of [["literature", litX, litArea], ["book", bookX, bookArea]]) {
-      const n = stages[kind].length, step = (y1 - y0) / n, span = area[1] - area[0], cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
-      const groups = stages[kind].map(([s]) => records(kind).filter((l2) => l2.stage === s)), need = groups.map((g2) => 18 + Math.ceil(g2.length / cols) * (ch + gap) + 6), extra = Math.max(0, y1 - y0 - need.reduce((a3, b3) => a3 + b3, 0)), steps = need.every((v2) => v2 <= step) ? need.map(() => step) : need.map((v2) => v2 + extra / n);
+    const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
+    const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap();
+    const plan = [["literature", litX, litArea], ["book", bookX, bookArea]].map(([kind, x2, area]) => {
+      const span = area[1] - area[0], cols = span >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span - (cols - 1) * 14) / cols));
+      const groups = stages[kind].map(([s]) => {
+        let items = records(kind).filter((l2) => l2.stage === s);
+        const shut = !!fold[kind + "|" + s], chunk = (list2) => {
+          const out2 = [];
+          for (let i = 0; i < list2.length; i += cols) out2.push(list2.slice(i, i + cols));
+          return out2;
+        };
+        let rows;
+        if (kind === "book" && s === "reading") {
+          items = items.slice().sort((a3, b3) => pct(kind, a3) - pct(kind, b3));
+          rows = chunk(items);
+        } else if (kind === "book" && s === "done") {
+          items = items.slice().sort((a3, b3) => String(b3.readDate || "").localeCompare(String(a3.readDate || "")));
+          const days = new Map();
+          for (const it of items) {
+            const day = it.readDate || "";
+            if (!days.has(day)) days.set(day, []);
+            days.get(day).push(it);
+          }
+          rows = [...days.values()].flatMap(chunk);
+        } else rows = chunk(items);
+        return { rows: shut ? [] : rows, shut, count: items.length };
+      });
+      const need = groups.map((g2) => 18 + g2.rows.length * (ch + gap) + 6);
+      return { kind, x2, area, cols, cw, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
+    });
+    // 内容多到放不下时，整页往下加长（绳子也跟着变长）；少了再缩回来
+    const H = Math.max(h, y0 + Math.max(...plan.map((p) => p.total)) + 104), y1 = H - 104;
+    const out = { w: w2, h: H, H, litX, bookX, y0, y1, ch, cards: [], levels: [], detail: detail2, drift: [] };
+    for (const { kind, x2, area, cols, cw, groups, need, total } of plan) {
+      const n = stages[kind].length, step = (y1 - y0) / n, extra = Math.max(0, y1 - y0 - total), steps = need.every((v2) => v2 <= step) ? need.map(() => step) : need.map((v2) => v2 + extra / n);
       let yy = y0;
       stages[kind].forEach(([stage2, label, depth], level) => {
-        const y2 = Math.round(yy), step2 = steps[level], items = groups[level];
+        const y2 = Math.round(yy), step2 = steps[level], g2 = groups[level];
         yy += step2;
-        out.levels.push({ kind, stage: stage2, label, depth, x: x2, y: y2, step: step2, area });
-        items.forEach((item, k2) => {
-          const col = k2 % cols, row = Math.floor(k2 / cols);
-          out.cards.push({ kind, item, col, row, x: area[0] + col * (cw + 14) + (row % 2 && cols > 1 ? 10 : 0), y: y2 + 18 + row * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
-        });
+        out.levels.push({ kind, stage: stage2, label, depth, x: x2, y: y2, step: step2, area, shut: g2.shut, count: g2.count });
+        g2.rows.forEach((row, r) => row.forEach((item, col) => {
+          out.cards.push({ kind, item, col, row: r, x: area[0] + col * (cw + 14) + (r % 2 && cols > 1 ? 10 : 0), y: y2 + 18 + r * (ch + gap), w: cw, h: ch, ky: y2, rx: x2 });
+        }));
       });
     }
-    d.literature.filter((l2) => l2.stage === "dropped").forEach((item, i) => out.drift.push({ kind: "literature", item, x: litX + 30 + i * 174, y: h - 74, w: 150, h: 34, rot: i % 2 ? 4 : -5 }));
+    d.literature.filter((l2) => l2.stage === "dropped").forEach((item, i2) => out.drift.push({ kind: "literature", item, x: litX + 30 + i2 * 174, y: H - 74, w: 150, h: 34, rot: i2 % 2 ? 4 : -5 }));
     return out;
   }
   function tag(c, cls = "") {
@@ -10993,15 +11029,15 @@ ${item.conclusion}`)}</pre>` : ""}
   function seaPage(root, w2, h) {
     const L3 = seaLayout(w2, h);
     d.cache.librarySea = L3;
-    let html = `<div class="lib-sea">`;
+    let html = `<div class="lib-sea"><span class="lib-sea-spacer" aria-hidden="true" style="position:absolute;left:0;top:${L3.H - 1}px;width:1px;height:1px;pointer-events:none"></span>`;
     html += `<div class="lib-head lib-head-lit" style="left:${L3.litX + 24}px">${icon2("book")}<span>\u6587\u732E</span></div><div class="lib-head lib-head-book" style="left:${L3.bookX + 24}px">${icon2("note")}<span>\u4E66\u7C4D</span></div>`;
     for (const v2 of L3.levels) {
       const zoneW = v2.area[1] - v2.x + 24;
       html += `<div class="library-depth-zone p2-background-hit" data-p2-drop="paper:${v2.kind}:${v2.stage}" style="left:${v2.x - 12}px;top:${v2.y - 12}px;width:${zoneW}px;height:${Math.round(v2.step)}px" aria-label="${v2.label}"></div>`;
-      html += `<div class="lib-depth" style="left:${v2.x - 18}px;top:${v2.y - 10}px"><b>${v2.label}</b><span class="mono">${v2.depth}</span></div>` + B3("library-knot", v2.kind + "|" + stages[v2.kind].findIndex((s) => s[0] === v2.stage), svg3(circle2(9, 9, 5, 1.3), 18), v2.label, `class="library-knot" data-knot-hover="${v2.kind}|${stages[v2.kind].findIndex((s) => s[0] === v2.stage)}" style="left:${v2.x - 9}px;top:${v2.y - 9}px"`);
+      html += B3("library-fold", v2.kind + "|" + v2.stage, `<b>${v2.label}<i class="lib-fold-mark">${v2.shut ? "▸" : "▾"}</i></b><span class="mono">${v2.shut ? v2.count + " 项 · " : ""}${v2.depth}</span>`, (v2.shut ? "展开" : "折叠") + v2.label, `class="lib-depth lib-depth-btn" aria-expanded="${!v2.shut}" style="left:${v2.x - 18}px;top:${v2.y - 10}px"`) + B3("library-knot", v2.kind + "|" + stages[v2.kind].findIndex((s) => s[0] === v2.stage), svg3(circle2(9, 9, 5, 1.3), 18), v2.label, `class="library-knot" data-knot-hover="${v2.kind}|${stages[v2.kind].findIndex((s) => s[0] === v2.stage)}" style="left:${v2.x - 9}px;top:${v2.y - 9}px"`);
     }
     html += L3.cards.map((c) => tag(c)).join("") + L3.drift.map((c) => tag(c, "drifted")).join("") + noteBranches(L3);
-    if (L3.drift.length) html += `<span class="lib-drift-note" style="left:${L3.drift.at(-1).x + L3.drift.at(-1).w + 16}px;top:${h - 62}px">\u6C89\u5E95 \xB7 \u5DF2\u653E\u5F03</span>`;
+    if (L3.drift.length) html += `<span class="lib-drift-note" style="left:${L3.drift.at(-1).x + L3.drift.at(-1).w + 16}px;top:${L3.H - 62}px">\u6C89\u5E95 \xB7 \u5DF2\u653E\u5F03</span>`;
     html += "</div>" + toolbar();
     const sel = d.ui.librarySelected, item = sel && find(sel.kind, sel.id);
     if (item) html += detail(sel.kind, item);
@@ -11013,7 +11049,7 @@ ${item.conclusion}`)}</pre>` : ""}
   }
   function listPane() {
     const tab = d.ui.libraryTab || "literature", groups = tab === "fav" ? [["\u6536\u85CF", [...d.literature.map((x2) => ["literature", x2]), ...d.books.map((x2) => ["book", x2])].filter(([k2, x2]) => meta(k2, x2).fav)]] : [...stages[tab].map(([s, l2]) => [l2, records(tab).filter((x2) => x2.stage === s).map((x2) => [tab, x2])]), ...tab === "literature" ? [["\u653E\u5F03", d.literature.filter((x2) => x2.stage === "dropped").map((x2) => ["literature", x2])]] : []];
-    const shut = d.ui.libraryShut ??= { "\u653E\u5F03": true };
+    const shut = d.ui.libraryShut ??= { "\u653E\u5F03": true, ...a2.libraryUi?.read().shut || {} };
     return `<section class="lib-list"><div class="lib-tabs" role="tablist">${[["literature", "\u6587\u732E"], ["book", "\u4E66\u7C4D"], ["fav", "\u6536\u85CF"]].map(([k2, l2]) => B3("library-tab", k2, l2, l2, `role="tab" aria-selected="${tab === k2}"`)).join("")}</div>
  <label class="lib-search hand-pill">${icon2("search")}<input type="search" data-library-query placeholder="\u641C\u7D22\u6807\u9898\u3001\u4F5C\u8005\u3001\u5173\u952E\u8BCD\u2026" value="${esc2(d.ui.libraryQuery || "")}" aria-label="\u641C\u7D22\u77E5\u8BC6\u5E93"></label>
  <div class="lib-groups">${groups.map(([label, items]) => `<div class="lib-group ${shut[label] ? "is-shut" : ""}">${B3("library-group", label, `${svg3(ink2(shut[label] ? [[7, 4], [13, 10], [7, 16]] : [[4, 7], [10, 13], [16, 7]], 1.3))}<b>${label}</b><span class="mono">${items.length}</span>`, label)}<ul>${items.map(([k2, x2]) => listRow(k2, x2)).join("")}</ul></div>`).join("")}</div></section>`;
@@ -11246,13 +11282,21 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     else if (key === "library-group") {
       const s = d.ui.libraryShut ??= {};
       s[id] = !s[id];
+      a2.libraryUi?.write({ shut: { ...s } });
     } else if (key === "library-untag") {
       const sel = d.ui.librarySelected, m2 = meta(sel.kind, find(sel.kind, sel.id));
       m2.keywords = m2.keywords.filter((k2) => k2 !== id);
     } else if (key === "library-pdf") {
       a2.openPDF?.(d.ui.librarySelected?.id);
       return true;
-    } else if (key === "library-knot") return true;
+    } else if (key === "library-fold") {
+      const [k2, st] = id.split("|");
+      toggleFold(k2, st);
+    } else if (key === "library-knot") {
+      const [k2, idx] = id.split("|"), st = stages[k2]?.[Number(idx)]?.[0];
+      if (!st) return true;
+      toggleFold(k2, st);
+    }
     a2.update();
     if(key === "library-edit-note") $5('[data-p2-form="library-note-edit"] textarea')?.focus();
     if (key === "library-edit-field") $5(".lib-inline-editor :is(input,textarea,select)")?.focus();
@@ -11519,7 +11563,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     return s + "</g>";
   }
   function scenery(box2) {
-    const w2 = box2.width, h = Math.min(box2.height, HOST.bottom - box2.top);
+    const w2 = box2.width, h = box2.scroll ? box2.height : Math.min(box2.height, HOST.bottom - box2.top);
     const root = $5("#library");
     if (root && d.cache.libraryRendered !== view() + root.clientWidth + "x" + root.clientHeight) render();
     return view() === "shelf" ? shelfScenery(w2, h) : seaScenery(w2, h);
@@ -13133,6 +13177,14 @@ function createLower(view) {
     navigate: (page2) => view.go(page2),
     drawScenery: () => view.drawScenery(),
     announce: (msg, undo) => view.frame.feedback(msg, undo),
+    // 知识库里「折叠了哪些阶段」这类界面状态：存在这台设备上，下次打开还是这样
+    libraryUi: {
+      read: () => plugin.local?.libraryUi || {},
+      write: (patch) => {
+        plugin.local.libraryUi = { ...plugin.local.libraryUi || {}, ...patch };
+        Promise.resolve(plugin.saveSettings?.()).catch(() => {});
+      }
+    },
     // 仓库里有 PDF 就在 Obsidian 里打开；Zotero 导进来的文献没有时，用笔记里的 zotero:// 链接在 Zotero 里打开
     openPDF: (path) => {
       if (plugin.writer.openPDF?.(path)) return;
@@ -20335,6 +20387,13 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       box2.y = box2.top = sheet.getBoundingClientRect().top - sheet.scrollTop;
       box2.scroll = true;
     }
+    if (box2 && this.page === "library") {
+      const sea = HOST.paper?.data?.ui?.libraryView !== "shelf" ? HOST.paper?.data?.cache?.librarySea : null, page = this.root.querySelector("#library");
+      if (sea && page && sea.H > box2.height - page.offsetTop) {
+        box2.height = page.offsetTop + sea.H;
+        box2.scroll = true;
+      }
+    }
     const w2 = cached ? cached.w : box2.width, h = cached ? cached.h : Math.max(box2.height, 1);
     if (svg3.dataset.w !== String(w2) || svg3.dataset.h !== String(h)) {
       svg3.setAttribute("viewBox", `0 0 ${w2} ${h}`);
@@ -21390,7 +21449,7 @@ var CompassPlugin = class extends import_obsidian7.Plugin {
     };
     this.localStore = { load: (k2) => this.app.loadLocalStorage(k2), save: (k2, v2) => this.app.saveLocalStorage(k2, v2) };
     const stored = this.localStore.load("tideline-local") || {};
-    this.local = { device: Object.assign({}, DEFAULT_DEVICE, stored.device), ai: Object.assign({}, DEFAULT_AI, this.settings.ai, stored.ai), examples: stored.examples || [], onboarded: !!stored.onboarded, lastPage: stored.lastPage || "today", calendars: stored.calendars || [], examplesAsked: !!stored.examplesAsked, version: stored.version || null, zotero: Object.assign({ on: true, folder: "" }, stored.zotero) };
+    this.local = { device: Object.assign({}, DEFAULT_DEVICE, stored.device), ai: Object.assign({}, DEFAULT_AI, this.settings.ai, stored.ai), examples: stored.examples || [], onboarded: !!stored.onboarded, lastPage: stored.lastPage || "today", calendars: stored.calendars || [], examplesAsked: !!stored.examplesAsked, version: stored.version || null, zotero: Object.assign({ on: true, folder: "" }, stored.zotero), libraryUi: stored.libraryUi || {} };
     if (this.local.device.motion !== "off") this.local.device.motion = "brief";
     const A2 = this.local.ai;
     A2.providers = Object.assign({}, ...PROVIDERS.map((id) => ({ [id]: { on: id === "claude", command: "", args: "", apiKeySecret: "", name: "" } })), A2.providers);

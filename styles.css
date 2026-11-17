@@ -4115,3 +4115,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 /* 知识库详情的正文区：不整条丢掉压在横线上的内容，而是靠近横线的那一行字渐渐变淡，到横线以下完全消失 */
 .compass-root .lib-record-body[data-r33-more="true"]{-webkit-mask-image:linear-gradient(#000 calc(var(--r34-cut,100%) - 34px),transparent var(--r34-cut,100%));mask-image:linear-gradient(#000 calc(var(--r34-cut,100%) - 34px),transparent var(--r34-cut,100%))}
+
+/* 海图视图：每个阶段点名字（或绳结）折叠 / 展开；内容多了整页自动加长，可以上下滚动 */
+.compass-root button.lib-depth{pointer-events:auto;cursor:pointer;background:none;border:0;box-shadow:none;padding:0;margin:0;text-align:right;color:inherit}
+.compass-root button.lib-depth:is(:hover,:focus-visible) b{text-decoration:underline dotted;text-underline-offset:4px}
+.compass-root button.lib-depth:focus-visible{outline:none}
+.compass-root .lib-depth .lib-fold-mark{font-style:normal;font-size:10px;margin-left:5px;color:var(--secondary)}
+.compass-root #sheet:has(> #library[data-library-view="sea"]:not([hidden])){max-height:calc(100cqh - 128px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
