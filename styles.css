@@ -4101,5 +4101,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-3,.HyperMD-header-3,h3){font-size:16px!important;line-height:1.5!important}
 .compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-4,.cm-header-5,.cm-header-6,.HyperMD-header-4,.HyperMD-header-5,.HyperMD-header-6,h4,h5,h6){font-size:15px!important;line-height:1.5!important}
 
-/* 书架页：右边一列放不下时整排加长（见 fitShelf），最多拉到离底边 10px */
-.compass-root #library .lib-shelf{bottom:max(10px,calc(108px - var(--lib-extra,0px)))}
+/* 书架页：整页可以上下滚动（页面按需加长，见 fitShelf） */
+.compass-root #sheet:has(> #library[data-library-view="shelf"]:not([hidden])){max-height:calc(100cqh - 128px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+
+/* 想法卡片：标题和正文之间的间隔缩短一半 */
+.compass-root .idea-card .idea-detail{padding-top:4px}
+.compass-root .idea-card .idea-excerpt{margin-top:4px}
+.compass-root .idea-card .idea-reading > :first-child{margin-top:4px!important}
