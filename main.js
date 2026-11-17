@@ -11189,7 +11189,7 @@ function libraryPage(a2) {
             if (!byProgress.has(p3)) byProgress.set(p3, []);
             byProgress.get(p3).push(it);
           }
-          rows = [...byProgress.values()].flatMap(chunkSolo);
+          rows = [...byProgress.values()].flatMap((g3) => chunkSolo(g3));
         } else if (kind === "book" && s === "done") {
           items = items.slice().sort(byDateDesc);
           rows = weekRows(items, prefix);
