@@ -4093,3 +4093,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .tl-suggest{position:fixed;z-index:200;width:230px;max-height:260px;overflow-y:auto;padding:8px 10px;box-sizing:border-box;scrollbar-width:thin}
 .compass-root .tl-suggest button{display:block;width:100%;padding:5px 6px;border:0;background:none;box-shadow:none;text-align:left;font:inherit;font-size:14px;line-height:1.45;color:var(--ink);cursor:pointer}
 .compass-root .tl-suggest button[aria-selected="true"]{background:color-mix(in srgb,var(--ink) 7%,transparent);font-weight:600}
+
+/* 任务正文（Obsidian 自带编辑器）和其他嵌在页面里的编辑器 / 预览：标题也不超过页面标题（任务标题 20px），逐级变小 */
+.compass-root .cm-editor,.compass-root .markdown-preview-view{--h1-size:18px;--h2-size:17px;--h3-size:16px;--h4-size:15px;--h5-size:15px;--h6-size:15px}
+.compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-1,.HyperMD-header-1,h1){font-size:18px!important;line-height:1.5!important}
+.compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-2,.HyperMD-header-2,h2){font-size:17px!important;line-height:1.5!important}
+.compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-3,.HyperMD-header-3,h3){font-size:16px!important;line-height:1.5!important}
+.compass-root :is(.cm-editor,.markdown-preview-view) :is(.cm-header-4,.cm-header-5,.cm-header-6,.HyperMD-header-4,.HyperMD-header-5,.HyperMD-header-6,h4,h5,h6){font-size:15px!important;line-height:1.5!important}
