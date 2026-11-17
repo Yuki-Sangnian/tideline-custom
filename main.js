@@ -10995,35 +10995,45 @@ function libraryPage(a2) {
       return m3 ? Number(m3[1]) : 0;
     };
     const plan = [["literature", litX, litArea], ["book", bookX, bookArea]].map(([kind, x2, area]) => {
-      const span0 = area[1] - area[0];
-      let cols = span0 >= 290 ? 2 : 1, cw = Math.min(212, Math.floor((span0 - (cols - 1) * 14) / cols)), span = span0;
-      // 书籍：读书笔记默认收起，右边空着，所以同一个月读完的可以一直横着排到页面右边
-      if (kind === "book") span = Math.max(span0, w2 - 48 - area[0]);
-      // 纸签宽度跟着书名走：保证最长的书名也能完整写在一行里（两列放不下就改成一列）
+      // 书籍默认横着排到页面右边；打开了读书笔记的话，右边要留给读书笔记，书名就只排在它左边
+      const anyNotes = kind === "book" && records(kind).some((it) => notesOn(it));
+      const limit = kind === "book" ? anyNotes ? Math.round(w2 * 0.75) - 24 : w2 - 48 : area[1], avail = Math.max(120, limit - area[0]);
+      // 每张纸签的宽度只跟自己的书名（和读完日期）有关：名字短就窄，名字长就宽，书名始终写在一行里
       const titleW = (it) => {
         let w3 = 0;
         for (const ch2 of String(it.title)) w3 += ch2.charCodeAt(0) > 255 ? 13 : 7.2;
         return Math.ceil(16 + w3 + (it.projectIds.length ? 34 : 12) + (kind === "book" && noteLinks(kind, it).length ? 24 : 0) + 6);
       };
-      const wide = Math.max(0, ...records(kind).map(titleW));
-      if (kind === "book") {
-        if (wide > cw) cw = Math.min(span, wide);
-        cols = Math.max(1, Math.min(6, Math.floor((span - 10 + 14) / (cw + 14))));
-      } else if (wide > cw) {
-        if (cols === 2 && wide * 2 + 14 + 10 > span) cols = 1;
-        cw = Math.min(cols === 2 ? Math.floor((span - 24) / 2) : span, wide);
-      }
-      const chunk = (list2, n2 = cols) => {
-        const out2 = [];
-        for (let i = 0; i < list2.length; i += n2) out2.push(list2.slice(i, i + n2));
-        return out2;
+      const dateW = (it) => {
+        if (!it.readDate || !["deep-done", "done"].includes(it.stage)) return 0;
+        let w3 = 0;
+        for (const ch2 of fmtDay(it.readDate)) w3 += ch2.charCodeAt(0) > 255 ? 10.5 : 6.4;
+        return Math.ceil(16 + w3 + 12);
+      };
+      const wOf = (it) => Math.min(avail, Math.max(96, titleW(it), dateW(it)));
+      // 一行排不下就换到下一行
+      const chunk = (list2) => {
+        const lines = [];
+        let line = [], used = 0;
+        for (const it of list2) {
+          const w3 = wOf(it);
+          if (line.length && used + 14 + w3 > avail) {
+            lines.push(line);
+            line = [];
+            used = 0;
+          }
+          used += (line.length ? 14 : 0) + w3;
+          line.push(it);
+        }
+        if (line.length) lines.push(line);
+        return lines;
       };
       // 打开了读书笔记的书单独占一行（右边接着它的读书笔记）
       const chunkSolo = (list2) => {
         const out2 = [];
         let seg = [];
         const flush = () => {
-          out2.push(...chunk(seg, Math.min(cols, 2)));
+          out2.push(...chunk(seg));
           seg = [];
         };
         for (const it of list2) {
@@ -11066,7 +11076,14 @@ function libraryPage(a2) {
         let rows;
         if (kind === "book" && s === "reading") {
           items = items.slice().sort((a3, b3) => pct(kind, a3) - pct(kind, b3));
-          rows = chunkSolo(items);
+          // 进度一样的横着排在一行里，进度小的在上
+          const byProgress = new Map();
+          for (const it of items) {
+            const p3 = pct(kind, it);
+            if (!byProgress.has(p3)) byProgress.set(p3, []);
+            byProgress.get(p3).push(it);
+          }
+          rows = [...byProgress.values()].flatMap(chunkSolo);
         } else if (kind === "book" && s === "done") {
           items = items.slice().sort(byDateDesc);
           rows = weekRows(items, prefix);
@@ -11090,12 +11107,12 @@ function libraryPage(a2) {
         return { rows: shut || sections ? [] : rows, sections, shut, count: items.length };
       });
       const need = groups.map((g2) => g2.sections ? secLayout(g2.sections).h : 18 + g2.rows.length * (ch + gap) + 6);
-      return { kind, x2, area, cols, cw, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
+      return { kind, x2, area, wOf, groups, need, total: need.reduce((a3, b3) => a3 + b3, 0) };
     });
     // 内容多到放不下时，整页往下加长（绳子也跟着变长）；少了再缩回来
     const place = (H) => {
       const y1 = H - 104, out = { w: w2, h: H, H, litX, bookX, y0, y1, ch, cards: [], levels: [], years: [], toggles: [], detail: detail2, drift: [] };
-      for (const { kind, x2, area, cols, cw, groups, need, total } of plan) {
+      for (const { kind, x2, area, wOf, groups, need, total } of plan) {
         const n = stages[kind].length, step = (y1 - y0) / n, extra = Math.max(0, y1 - y0 - total), steps = need.every((v2) => v2 <= step) ? need.map(() => step) : need.map((v2) => v2 + extra / n);
         let yy = y0;
         stages[kind].forEach(([stage2, label, depth], level) => {
@@ -11103,9 +11120,14 @@ function libraryPage(a2) {
           yy += step2;
           out.levels.push({ kind, stage: stage2, label, depth, x: x2, y: y2, step: step2, area, shut: g2.shut, count: g2.count });
           const putRows = (rowsList, top, sec, sy) => rowsList.forEach((row, r) => {
-            const ry = top + r * (ch + gap), dx = r % 2 && cols > 1 ? 10 : 0;
-            row.forEach((item, col) => out.cards.push({ kind, item, col, row: r, sec, sy, x: area[0] + col * (cw + 14) + dx, y: ry, w: cw, h: ch, ky: y2, rx: x2 }));
-            if (row.toggle) out.toggles.push({ kind, stage: stage2, ...row.toggle, x: area[0] + (row.length - 1) * (cw + 14) + dx + cw + 8, y: ry + ch / 2 - 10 });
+            const ry = top + r * (ch + gap);
+            let cx = area[0];
+            row.forEach((item, col) => {
+              const w3 = wOf(item);
+              out.cards.push({ kind, item, col, row: r, sec, sy, x: cx, y: ry, w: w3, h: ch, ky: y2, rx: x2 });
+              cx += w3 + 14;
+            });
+            if (row.toggle) out.toggles.push({ kind, stage: stage2, ...row.toggle, x: cx - 14 + 8, y: ry + ch / 2 - 10 });
           });
           putRows(g2.rows, y2 + 18);
           if (g2.sections) for (const { sec, sy, top } of secLayout(g2.sections).pos) {
@@ -11719,7 +11741,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
           s += ink2([[x2 + 4, yv.y], [e2, yv.y + 1]], 0.6, M2) + circle2(x2, yv.y, 3.8, 1) + circle2(x2, yv.y, 1.2, 0.6);
         }
         for (const c of cs) {
-          const up = cs.find((o) => o.col === c.col && o.row === c.row - 1 && o.sec === c.sec), top = c.sy ?? v2.y, y0 = up ? up.y + up.h : top + 1;
+          const up = cs.filter((o) => o.row === c.row - 1 && o.sec === c.sec && Math.min(c.x + c.w, o.x + o.w) - Math.max(c.x, o.x) >= 36).sort((p3, q3) => Math.abs(p3.x - c.x) - Math.abs(q3.x - c.x))[0], top = c.sy ?? v2.y, y0 = up ? up.y + up.h : top + 1;
           for (const sx of up ? [Math.max(c.x, up.x) + 18, Math.min(c.x + c.w, up.x + up.w) - 18] : [c.x + 16, c.x + c.w - 16]) s += ink2([[sx, y0], [sx, c.y]], 0.6, M2) + (up ? "" : circle2(sx, top + 1, 1.3, 0.6));
         }
       }
