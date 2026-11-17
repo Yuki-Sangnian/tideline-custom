@@ -10935,7 +10935,7 @@ function libraryPage(a2) {
     if (!hasAny) out += `<p class="lib-note-empty" style="position:absolute;left:${x}px;top:100px;width:${width}px">在书籍的笔记中添加 [[笔记名]]，这里会自动显示分支。</p>`;
     return out;
   }
-  // 每个阶段下面的纸签怎么排：在读按进度从小到大；读完按读完日期，越晚读完越靠上；同一周读完的横着排成一行（越靠近绳子日期越大），这一行默认只显示最近的一本，可展开 / 收起；其他阶段按原顺序
+  // 每个阶段下面的纸签怎么排：在读按进度从小到大；读完按读完日期，越晚读完越靠上；同一个月读完的横着排成一行（越靠近绳子日期越大），这一行默认只显示最近的一本，可展开 / 收起；其他阶段按原顺序
   const foldMap = () => d.ui.libraryFold ||= { ...a2.libraryUi?.read().fold || {} };
   const yearOpenMap = () => d.ui.libraryYearOpen ||= { ...a2.libraryUi?.read().yearOpen || {} };
   const rowOpenMap = () => d.ui.libraryRowOpen ||= { ...a2.libraryUi?.read().rowOpen || {} };
@@ -11030,7 +11030,7 @@ function libraryPage(a2) {
         flush();
         return out2;
       };
-      // 读完：同一周读完的排成一行，默认只显示最近的一本，其余收在「+N」里
+      // 读完：同一个月读完的排成一行，默认只显示最近的一本，其余收在「+N」里
       const weekRows = (list2, prefix) => {
         const out2 = [], seq = new Map();
         const emit = (g2) => {
@@ -11042,11 +11042,11 @@ function libraryPage(a2) {
         };
         const weeks = new Map();
         for (const it of list2) {
-          const wk = isoWeek(it.readDate) || "-";
+          const wk = /^(\d{4}-\d{2})/.exec(String(it.readDate || ""))?.[1] || "-";
           if (!weeks.has(wk)) weeks.set(wk, []);
           weeks.get(wk).push(it);
         }
-        // 同一周的先排在一起；打开了读书笔记的书从这一行里拿出来，在它下面单独占一行
+        // 同一个月的先排在一起；打开了读书笔记的书从这一行里拿出来，在它下面单独占一行
         for (const [wk, list3] of weeks) {
           const rest = list3.filter((it) => !notesOn(it));
           if (rest.length) emit({ week: wk, items: rest });
@@ -11186,7 +11186,7 @@ ${item.conclusion}`)}</pre>` : ""}
       html += B3("library-fold", v2.kind + "|" + v2.stage, `<b>${v2.label}<i class="lib-fold-mark">${v2.shut ? "▸" : "▾"}</i></b><span class="mono">${v2.shut ? v2.count + " 项 · " : ""}${v2.depth}</span>`, (v2.shut ? "展开" : "折叠") + v2.label, `class="lib-depth lib-depth-btn" aria-expanded="${!v2.shut}" style="left:${v2.x - 18}px;top:${v2.y - 10}px"`) + B3("library-knot", v2.kind + "|" + stages[v2.kind].findIndex((s) => s[0] === v2.stage), svg3(circle2(9, 9, 5, 1.3), 18), v2.label, `class="library-knot" data-knot-hover="${v2.kind}|${stages[v2.kind].findIndex((s) => s[0] === v2.stage)}" style="left:${v2.x - 9}px;top:${v2.y - 9}px"`);
     }
     for (const yv of L3.years) html += B3("library-year", yv.key, `<b>${esc2(yv.label)}<i class="lib-fold-mark">${yv.open ? "▾" : "▸"}</i></b><span class="mono">${yv.count} ${yv.kind === "book" ? "本" : "篇"}</span>`, (yv.open ? "折叠" : "展开") + yv.label + (yv.year ? "年" : ""), `class="lib-depth lib-year-btn" aria-expanded="${yv.open}" style="left:${yv.x - 14}px;top:${yv.y - 9}px"`);
-    for (const t of L3.toggles) html += B3("library-row", t.key, t.open ? "收起 ◂" : `+${t.hidden} ▸`, t.open ? "收起这一周" : "展开这一周其余 " + t.hidden + " 本", `class="lib-row-toggle" aria-expanded="${t.open}" style="left:${t.x}px;top:${t.y}px"`);
+    for (const t of L3.toggles) html += B3("library-row", t.key, t.open ? "收起 ◂" : `+${t.hidden} ▸`, t.open ? "收起这个月" : "展开这个月其余 " + t.hidden + " 本", `class="lib-row-toggle" aria-expanded="${t.open}" style="left:${t.x}px;top:${t.y}px"`);
     html += L3.cards.map((c) => tag(c)).join("") + L3.drift.map((c) => tag(c, "drifted")).join("") + noteBranches(L3);
     if (L3.drift.length) html += `<span class="lib-drift-note" style="left:${L3.drift.at(-1).x + L3.drift.at(-1).w + 16}px;top:${L3.H - 62}px">\u6C89\u5E95 \xB7 \u5DF2\u653E\u5F03</span>`;
     html += "</div>" + toolbar();
