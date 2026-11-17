@@ -5493,7 +5493,7 @@ function makeDocx(title) {
   const files = [
     ["[Content_Types].xml", head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
     ["_rels/.rels", head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
-    ["word/document.xml", head + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>' + xml(title) + '</w:t></w:r></w:p><w:p/></w:body></w:document>']
+    ["word/document.xml", head + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>']
   ].map(([name, text]) => ({ name: enc.encode(name), data: enc.encode(text) }));
   const parts = [], central = [];
   let offset = 0;
@@ -5582,7 +5582,7 @@ function libraryFileFlow({ plugin, view, path, kind, title }) {
   });
   choice("新建 MD 笔记", "在「x/" + (book ? "书籍" : "文献") + "」文件夹里新建一篇 Markdown 笔记", async () => {
     await ensureFolder();
-    const file = await app.vault.create(unique(safe + " 笔记", "md"), "# " + safe + "\n\n");
+    const file = await app.vault.create(unique(safe + " 笔记", "md"), "");
     await finish(file, "已新建 MD 笔记");
   });
   modal.open();
