@@ -4232,3 +4232,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .idea-card.idea-settled{padding-top:5px;padding-bottom:5px;margin-bottom:0}
 .compass-root .idea-card.idea-settled .idea-card-title{line-height:1.5;padding-top:0;padding-bottom:0}
 .compass-root .idea-card.idea-settled .idea-card-star,.compass-root .idea-card.idea-settled .idea-project-link{top:50%;transform:translateY(-50%)}
+
+.compass-root .linked-schedules{display:flex;flex-direction:column;min-width:0}
+.compass-root .linked-schedules .schedule-linked-row{padding:7px 2px;gap:12px;font-size:14px}
+.compass-root .linked-schedules .schedule-linked-row.is-past{opacity:.55}
+.compass-root .pd-sub-schedules{display:flex;justify-content:space-between;align-items:baseline;margin-top:18px}
+.compass-root .goal-schedules{align-items:flex-start}

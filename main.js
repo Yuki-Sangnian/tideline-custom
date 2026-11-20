@@ -7098,6 +7098,31 @@ function installScheduleEditing(view,plugin){
     for(const day of plugin.index.days.values())for(const event of day.schedules||[])if("schedule:"+day.date+":"+event.id===id){openScheduleEditor(view,plugin,{...event,originDay:day.date,scheduleId:event.id});return;}
   },{capture:true});
 }
+// 日程关联了项目的，当天这条日程的时长算进项目（同名日程有的关联、有的没关联时，按各自时长比例分开）
+function scheduleEffortPairs(index,date,effort,skip){
+  const byTitle=new Map(),pairs=[];
+  for(const e of scheduleEventsForDay(index,date)){
+    const hours=Math.max(0,(e.endMs-e.startMs)/36e5),m=byTitle.get(e.title)||new Map();
+    m.set(e.project||"",(m.get(e.project||"")||0)+hours);byTitle.set(e.title,m);
+  }
+  for(const [name,value] of Object.entries(effort||{})){
+    const h=Number(value),m=byTitle.get(name);
+    if(!(h>0)||!m||skip?.has(name)||![...m.keys()].some(Boolean)){pairs.push([name,value]);continue;}
+    const total=[...m.values()].reduce((a,b)=>a+b,0)||1;
+    for(const [project,w] of m)pairs.push([project||name,h*w/total]);
+  }
+  return pairs;
+}
+function scheduleLinkedRows(list,max=8){
+  const e=v=>String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])),now=Date.now();
+  const upcoming=list.filter(x=>Date.parse(x.end)>now).sort((a,b)=>a.start.localeCompare(b.start)),past=list.filter(x=>Date.parse(x.end)<=now).sort((a,b)=>b.start.localeCompare(a.start));
+  return [...upcoming,...past].slice(0,max).map(x=>`<button type="button" class="schedule-list-row schedule-linked-row${Date.parse(x.end)<=now?" is-past":""}" data-edit-schedule="${e(x.key)}"><time>${e(x.start.slice(5,10).replace("-","/"))} ${e(x.start.slice(11,16))}–${e(x.end.slice(11,16))}</time><span>${e(x.title)}</span></button>`).join("");
+}
+function scheduleLinkedSection(list){
+  if(!list.length)return "";
+  const now=Date.now(),hours=list.reduce((n,x)=>n+Math.max(0,Math.min(Date.parse(x.end),now)-Date.parse(x.start))/36e5,0);
+  return `<header class="pd-sub pd-sub-schedules"><span>日程</span><span class="mono">已投入 ${formatEffortHours(hours)}h</span></header><div class="linked-schedules">${scheduleLinkedRows(list)}</div>`;
+}
 function taskEffortForDay(index,date,now=Date.now()) {
   const day=index.days.get(date)||{}, effort={...(day.effort||{})}, previous=day.effortAuto||{}, auto={}, events=[];
   for(const task of index.tasks.values())if(!index.examples?.has(task.id)&&task.status!=="cancelled") {
@@ -10416,7 +10441,7 @@ function projectPage(a2) {
     const tasks = d.tasks.filter((t) => t.projectId === p.id).sort(compareProjectTasks), done2 = tasks.filter((t) => t.status === "done").length, who = d.people.find((x2) => x2.id === d.ui.projectPerson), ideas = p.ideaIds.map((id) => d.ideas.find((x2) => x2.id === id)).filter(Boolean), lits = p.literatureIds.map((id) => d.literature.find((x2) => x2.id === id)).filter(Boolean), bar = tasks.length ? done2 / tasks.length : 0;
     const menu = d.ui.projectMenu ? `<div class="project-status-menu hand-popup" role="group" aria-label="\u9879\u76EE\u72B6\u6001">${statuses.map(([status, glyph, label]) => B3("project-status", status, G3(glyph) + `<span>${label}</span>`, label, `aria-pressed="${p.status === status}"`)).join("")}</div>` : "";
     const head = `<div class="pd-head"><div class="pd-title">${chart.ship(52, true)}<div class="pd-title-text"><div class="pd-title-row"><h3>${esc2(p.title)}</h3><span class="pd-status">${statusLabel(p.status)}</span>${p.resume ? `<time>${fmt(p.resume)}</time>` : ""}<span class="project-due-field"><button type="button" data-edit-project-due aria-label="${p.due ? "修改截止日期" : "设置截止日期"}" title="设置截止日期">${icon2("calendar",15)}${p.due ? `<time>${esc2(p.due)}</time>` : ""}</button><input hidden type="date" data-project-due="${esc2(p.id)}" aria-label="项目截止日期" value="${esc2(p.due || "")}"></span></div>${p.description ? `<p>${esc2(p.description)}</p>` : ""}</div><div class="project-detail-top">${B3("project-close", "", G3("left"), "\u6298\u56DE\u6D77\u56FE")}${B3("project-status-menu", "", G3(statuses.find((s) => s[0] === p.status)[1]), "\u66F4\u6539\u9879\u76EE\u72B6\u6001")}${B3("project-source", "", G3("corner"), "\u5C55\u5F00\u9879\u76EE Markdown")}${menu}</div></div><div class="pd-links"><div class="pd-link">${G3("goal")}<span class="pd-label">\u5173\u8054\u76EE\u6807</span>${HOST.projectGoalChips ? HOST.projectGoalChips(p, d, B3) : p.goalIds.map((id) => B3("open-object", id, esc2(d.goals.find((x2) => x2.id === id).title), d.goals.find((x2) => x2.id === id).title, 'data-kind="goal" class="pd-chip"')).join("")}</div><div class="pd-link">${icon2("star")}<span class="pd-label">\u76F8\u5173\u60F3\u6CD5</span><span class="mono pd-count">${ideas.length}</span>${ideas[0] ? B3("open-object", ideas[0].id, "\u201C" + esc2(ideas[0].title) + "\u201D", ideas[0].title, 'data-kind="idea" class="pd-quote"') : ""}</div><div class="pd-link">${icon2("book")}<span class="pd-label">\u76F8\u5173\u6587\u732E</span><span class="mono pd-count">${lits.length}</span>${lits[0] ? B3("open-object", lits[0].id, esc2(lits[0].title), lits[0].title, 'data-kind="literature" class="pd-quote"') : ""}</div></div></div>`;
-    const taskCol = `<section class="pd-tasks"><header><span>\u4EFB\u52A1</span><span class="mono">${done2}/${tasks.length}</span><span class="pd-bar" aria-hidden="true">${svg3(ink2([[2, 4], [158, 4]], 1, a2.TICK) + (bar ? ink2([[2, 4], [2 + 156 * bar, 4]], 2.4, NOW) : ""), 160, 8)}</span></header><div class="project-task-list">${tasks.map((t) => `<div class="project-task-row ${t.status==='done'?'is-completed':''}">${B3("project-task-complete", t.id, stateMark(t.status), "\u5B8C\u6210 " + t.title)}${B3("open-object", t.id, esc2(t.title), "\u6253\u5F00\u4EFB\u52A1 " + t.title, 'data-kind="task"')}<time class="mono ${t.date === d.clock.date ? "is-today" : ""}">${md7(t.date)}</time></div>`).join("") || '<p class="pd-empty">\u8FD8\u6CA1\u6709\u4EFB\u52A1</p>'}</div>${HOST.projectTaskAdd?.(p, d) || ""}</section>`;
+    const taskCol = `<section class="pd-tasks"><header><span>\u4EFB\u52A1</span><span class="mono">${done2}/${tasks.length}</span><span class="pd-bar" aria-hidden="true">${svg3(ink2([[2, 4], [158, 4]], 1, a2.TICK) + (bar ? ink2([[2, 4], [2 + 156 * bar, 4]], 2.4, NOW) : ""), 160, 8)}</span></header><div class="project-task-list">${tasks.map((t) => `<div class="project-task-row ${t.status==='done'?'is-completed':''}">${B3("project-task-complete", t.id, stateMark(t.status), "\u5B8C\u6210 " + t.title)}${B3("open-object", t.id, esc2(t.title), "\u6253\u5F00\u4EFB\u52A1 " + t.title, 'data-kind="task"')}<time class="mono ${t.date === d.clock.date ? "is-today" : ""}">${md7(t.date)}</time></div>`).join("") || '<p class="pd-empty">\u8FD8\u6CA1\u6709\u4EFB\u52A1</p>'}</div>${HOST.projectTaskAdd?.(p, d) || ""}${scheduleLinkedSection((d.schedules||[]).filter(e=>e.project===p.title))}</section>`;
     const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button></header><div class="project-progress-list">${p.stations.map((st, i) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time>`, st.title, `class="pd-station state-${st.state}" data-last="${i === p.stations.length - 1}"`)).join("")}</div></section>`;
     const peopleCol = `<section class="project-relations"><header><span>\u76F8\u5173\u4EBA\u5458</span></header><div class="project-people">${HOST.projectPeople ? HOST.projectPeople(p, d, B3) : p.peopleIds.map((id) => {
       const who2 = d.people.find((x2) => x2.id === id);
@@ -13060,7 +13085,7 @@ function automaticQuarter(ix, date) {
     const tasks = [...ix.tasks.values()].filter(t => real(t) && t.status === "done" && inside(t.completed || t.date,a,b) && (t.completed || t.date) <= date);
     const effort = {}, sleeps = [], habitValues = []; let waterDays=0;
     for (const day of days) {
-      for (const [name0,hours] of Object.entries(day.effort || {})) if(Number(hours)>0) { const name = projectOf(name0); effort[name]=(effort[name]||0)+Number(hours); }
+      for (const [name0,hours] of scheduleEffortPairs(ix,day.date,day.effort,keep)) if(Number(hours)>0) { const name = projectOf(name0); effort[name]=(effort[name]||0)+Number(hours); }
       if(day.sleepHours != null && Number.isFinite(Number(day.sleepHours))) sleeps.push(Number(day.sleepHours));
       for(const habit of ix.config.habits) { if(habit.id in day.habits) habitValues.push(!!day.habits[habit.id]); if((habit.id === "water" || /喝.*水|饮水|喝水/.test(habit.name)) && day.habits[habit.id]) waterDays++; }
     }
@@ -13337,7 +13362,7 @@ function buildModel(index, clock, prev) {
   for (const date of weekDates) {
     if(date>date2)continue;
     const day = ix.days.get(date);
-    for (const [title, value] of Object.entries(taskEffortForDay(ix,date).effort)) {
+    for (const [title, value] of scheduleEffortPairs(ix,date,taskEffortForDay(ix,date).effort,new Set([...ix.goals.values(),...ix.projects.values()].map(x=>x.title)))) {
       if (EX.has(day?.path) && !day?.effortRecorded && !realEffortNames.has(title)) continue;
       weekEffort[title] = (weekEffort[title] || 0) + (Number(value) || 0);
     }
@@ -18667,6 +18692,7 @@ function createPeople(view) {
       <div class="goal-field"><span class="goal-label">\u4E0A\u6B21\u8054\u7CFB</span><span class="person-last ${due?.over ? "overdue" : ""}">${esc(lastText)}</span></div>
       <div class="goal-field"><span class="goal-label">\u5F85\u6C9F\u901A</span><span>${n ? `${n} \u4EF6\uFF0C\u5728\u5DE6\u8FB9\u8D27\u5355\u91CC` : "\u6CA1\u6709\u6512\u7740\u7684\u4E8B"}</span></div>
       ${projects.length ? `<div class="goal-field goal-projects"><span class="goal-label">\u9879\u76EE</span><span class="goal-chips">${projects.map((x2) => `<button type="button" class="goal-chip person-project" data-p2="open-object" data-kind="project" data-id="${esc(x2.id)}" aria-label="\u6253\u5F00\u9879\u76EE ${esc(x2.title)}">${esc(x2.title)}</button>`).join("")}</span></div>` : ""}
+      ${(d.schedules||[]).some(e=>(e.people||[]).includes(p.name)) ? `<div class="goal-field goal-schedules"><span class="goal-label">日程</span><div class="linked-schedules">${scheduleLinkedRows((d.schedules||[]).filter(e=>(e.people||[]).includes(p.name)),6)}</div></div>` : ""}
       <div class="person-log"><form class="goal-title-form person-log-form" data-person-form="log"><input name="text" value="${esc(d.ui.personLogDraft || "")}" placeholder="\u8BB0\u4E00\u7B14\uFF0C\u56DE\u8F66\uFF08\u5E26\u4ECA\u5929\u7684\u65E5\u671F\uFF09" aria-label="\u7ED9 ${esc(p.name)} \u8BB0\u4E00\u7B14" autocomplete="off">${underline2}</form>
         ${list2.length ? `<ul>${list2.map((h) => `<li><span class="mono">${h.date ? esc(h.date.slice(5).replace("-", "/")) : "\xB7"}</span><span>${esc(h.text)}</span></li>`).join("")}</ul>` : '<p class="goal-muted">\u8FD8\u6CA1\u6709\u8BB0\u5F55\uFF1A\u89C1\u5B8C\u9762\u70B9\u201C\u89C1\u9762\u4E86\u201D\uFF0C\u6216\u5728\u4E0A\u9762\u8BB0\u4E00\u7B14</p>'}
         ${log.length > 6 ? `<button type="button" class="person-log-all" data-person-act="log-all">${all ? "\u6536\u8D77" : `\u5168\u90E8 ${log.length} \u6761`}</button>` : ""}</div>
