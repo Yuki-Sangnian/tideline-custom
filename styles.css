@@ -4248,3 +4248,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .pd-link-toggle{display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;background:none;box-shadow:none;cursor:pointer;flex:none}
 .compass-root .pd-link-toggle svg{width:18px!important;height:18px!important}
 .compass-root .pd-fold-mark{font-size:11px;color:var(--secondary)}
+
+.compass-root .pd-station[draggable="true"]{cursor:grab}
+.compass-root .pd-station.is-drop-target{box-shadow:inset 0 2px 0 var(--now,#C8206A)}
+.compass-root .pd-stations header{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.compass-root .pd-auto-sort{font-size:11px;color:var(--secondary);background:none;border:0;box-shadow:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}

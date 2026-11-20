@@ -5170,6 +5170,7 @@ var Index = class {
         due: date(fm.due),
         resume: date(fm.resume),
         completed: date(fm.completed),
+        milestoneSort: fm.milestoneSort === "manual" ? "manual" : "",
         goals: links(fm.goals),
         people: links(fm.people),
         ideas: links(fm.ideas),
@@ -5809,6 +5810,28 @@ var TYPES = [["project", "route", "项目"], ["book", "book", "书籍"], ["liter
 var TOKENS = /周[一二三四五六日天]|#[^\s#@]+|@[^\s#@]+/g;
 var CAPTURE_HTML = `<div id="capture" class="capture paper-strip" hidden><div id="capture-types" class="capture-types"></div><form id="capture-form"><textarea id="capture-input" aria-label="记一笔" rows="1" placeholder="Enter 保存，Shift+Enter 换行"></textarea><div id="capture-tokens"></div><div id="capture-schedule" hidden><label>日期<input type="date" id="capture-schedule-date"></label><label>开始<input type="time" id="capture-schedule-start"></label><label>结束<input type="time" id="capture-schedule-end"></label><label class="capture-schedule-wide">项目<select id="capture-schedule-project"></select></label><div id="capture-schedule-people" class="schedule-people capture-schedule-wide" aria-label="关联人物"></div><small>结束早于开始时，按次日结束计算。日程与任务分开记录。</small></div><textarea id="capture-description" aria-label="日程说明（可选）" rows="1" placeholder="日程说明（可选）"></textarea><textarea id="capture-idea-content" hidden rows="4" aria-label="想法内容" placeholder="写下想法的具体内容…（回车保存，Shift＋回车换行）"></textarea></form><button class="icon-button" data-action="capture-save" aria-label="\u8BB0\u4E0B">\u21B5</button></div>`;
 var clean = (s) => String(s).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "\u672A\u547D\u540D";
+// 里程碑从上到下的显示顺序（返回原数组下标）：自动排序是未开始、进行中、已完成（最新完成的在上）；自己排过序就按自己的，数组本身从下往上
+function milestoneDisplayOrder(list, manual) {
+  const idx = list.map((_, i) => i);
+  if (manual) return idx.reverse();
+  const rank = { open: 0, in_progress: 1, done: 2 };
+  return idx.sort((a, b) => rank[list[a].state || "open"] - rank[list[b].state || "open"] || (list[a].state === "done" ? (list[b].date || "").localeCompare(list[a].date || "") : 0) || b - a);
+}
+async function moveProjectMilestone(view, plugin, path, from, to) {
+  const project = plugin.index.projects.get(path);
+  if (!project || from === to || !project.milestones?.[from] || !project.milestones?.[to]) return;
+  const order = milestoneDisplayOrder(project.milestones, project.milestoneSort === "manual");
+  const fromPos = order.indexOf(from), toPos = order.indexOf(to); order.splice(fromPos, 1); order.splice(toPos, 0, from);
+  try {
+    await plugin.writer.frontmatter(path, fm => {
+      const entries = Array.isArray(fm.milestones) ? fm.milestones : [];
+      if (entries.length !== project.milestones.length) throw new Error("里程碑已被改动，请刷新后再试");
+      fm.milestones = [...order].reverse().map((i) => entries[i]);
+      fm.milestoneSort = "manual";
+    });
+    view.schedule(); view.frame.feedback("已调整里程碑顺序");
+  } catch (e) { view.frame.feedback("排序失败：" + e.message); }
+}
 function openProjectMilestone(view, plugin, path, index = null) {
   const project = plugin.index.projects.get(path), current = index != null ? project?.milestones?.[index] : null;
   if (!project) { view.frame.feedback("请先选择一个项目"); return; }
@@ -10459,10 +10482,7 @@ function projectPage(a2) {
     return Number(a.status==="done")-Number(b.status==="done") || (a.date||"9999-12-31").localeCompare(b.date||"9999-12-31") || a.title.localeCompare(b.title,"zh-Hans-u-co-pinyin",{numeric:true,sensitivity:"base"});
   }
   // 里程碑从下往上推进：已完成在最下面（最早完成的最靠下），进行中在中间，未开始在最上面（越靠后的越靠上）
-  const stationRows = (p) => p.stations.map((st, i) => ({ ...st, order: i })).sort((a, b) => {
-    const rank = { open: 0, in_progress: 1, done: 2 };
-    return rank[a.state] - rank[b.state] || (a.state === "done" ? (b.date || "").localeCompare(a.date || "") : 0) || b.order - a.order;
-  });
+  const stationRows = (p) => milestoneDisplayOrder(p.stations, p.milestoneSort === "manual").map((i) => ({ ...p.stations[i], order: i }));
   const linkToggle = (kind, glyph, label, n) => {
     const open = !!d.ui.projectLinksOpen?.[kind];
     return B3("project-links-toggle", kind, glyph, (open ? "\u6536\u8D77" : "\u5C55\u5F00") + label, `class="pd-link-toggle" aria-expanded="${open}"`) + `<span class="pd-label">${label}</span><span class="mono pd-count">${n}</span>${n ? `<span class="pd-fold-mark" aria-hidden="true">${open ? "\u25BE" : "\u25B8"}</span>` : ""}`;
@@ -10472,7 +10492,7 @@ function projectPage(a2) {
     const menu = d.ui.projectMenu ? `<div class="project-status-menu hand-popup" role="group" aria-label="\u9879\u76EE\u72B6\u6001">${statuses.map(([status, glyph, label]) => B3("project-status", status, G3(glyph) + `<span>${label}</span>`, label, `aria-pressed="${p.status === status}"`)).join("")}</div>` : "";
     const head = `<div class="pd-head"><div class="pd-title">${chart.ship(52, true)}<div class="pd-title-text"><div class="pd-title-row"><h3>${esc2(p.title)}</h3><span class="pd-status">${statusLabel(p.status)}</span>${p.resume ? `<time>${fmt(p.resume)}</time>` : ""}<span class="project-due-field"><button type="button" data-edit-project-due aria-label="${p.due ? "修改截止日期" : "设置截止日期"}" title="设置截止日期">${icon2("calendar",15)}${p.due ? `<time>${esc2(p.due)}</time>` : ""}</button><input hidden type="date" data-project-due="${esc2(p.id)}" aria-label="项目截止日期" value="${esc2(p.due || "")}"></span></div>${p.description ? `<p>${esc2(p.description)}</p>` : ""}</div><div class="project-detail-top">${B3("project-close", "", G3("left"), "\u6298\u56DE\u6D77\u56FE")}${B3("project-status-menu", "", G3(statuses.find((s) => s[0] === p.status)[1]), "\u66F4\u6539\u9879\u76EE\u72B6\u6001")}${B3("project-source", "", G3("corner"), "\u5C55\u5F00\u9879\u76EE Markdown")}${menu}</div></div><div class="pd-links"><div class="pd-link">${G3("goal")}<span class="pd-label">\u5173\u8054\u76EE\u6807</span>${HOST.projectGoalChips ? HOST.projectGoalChips(p, d, B3) : p.goalIds.map((id) => B3("open-object", id, esc2(d.goals.find((x2) => x2.id === id).title), d.goals.find((x2) => x2.id === id).title, 'data-kind="goal" class="pd-chip"')).join("")}</div><div class="pd-link">${linkToggle("ideas", icon2("star"), "\u76F8\u5173\u60F3\u6CD5", ideas.length)}${ideas.length && d.ui.projectLinksOpen?.ideas ? ideas.map((x2) => B3("open-object", x2.id, "\u201C" + esc2(x2.title) + "\u201D", x2.title, 'data-kind="idea" class="pd-quote"')).join("") : ""}</div><div class="pd-link">${linkToggle("lits", icon2("book"), "\u76F8\u5173\u6587\u732E", lits.length)}${lits.length && d.ui.projectLinksOpen?.lits ? lits.map((x2) => B3("open-object", x2.id, esc2(x2.title), x2.title, 'data-kind="literature" class="pd-quote"')).join("") : ""}</div></div></div>`;
     const taskCol = `<section class="pd-tasks"><header><span>\u4EFB\u52A1</span><span class="mono">${done2}/${tasks.length}</span><span class="pd-bar" aria-hidden="true">${svg3(ink2([[2, 4], [158, 4]], 1, a2.TICK) + (bar ? ink2([[2, 4], [2 + 156 * bar, 4]], 2.4, NOW) : ""), 160, 8)}</span></header><div class="project-task-list">${tasks.map((t) => `<div class="project-task-row ${t.status==='done'?'is-completed':''}">${B3("project-task-complete", t.id, stateMark(t.status), "\u5B8C\u6210 " + t.title)}${B3("open-object", t.id, esc2(t.title), "\u6253\u5F00\u4EFB\u52A1 " + t.title, 'data-kind="task"')}<time class="mono ${t.date === d.clock.date ? "is-today" : ""}">${md7(t.date)}</time></div>`).join("") || '<p class="pd-empty">\u8FD8\u6CA1\u6709\u4EFB\u52A1</p>'}</div>${HOST.projectTaskAdd?.(p, d) || ""}${scheduleLinkedSection((d.schedules||[]).filter(e=>e.project===p.title))}</section>`;
-    const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button></header><div class="project-progress-list">${stationRows(p).map((st, i, rows) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time><span class="pd-station-edit" role="button" tabindex="0" data-edit-milestone="${esc2(p.id)}|${esc2(st.id)}" aria-label="编辑或删除里程碑" title="编辑或删除（也可右键）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4 9-9 3 3-9 9zM12 5l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>`, st.title, `class="pd-station state-${st.state}" data-last="${i === rows.length - 1}"`)).join("")}</div></section>`;
+    const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button>${p.milestoneSort === "manual" ? `<button type="button" class="pd-auto-sort" data-milestone-auto="${esc2(p.id)}" title="按状态自动排序">自动排序</button>` : ""}</header><div class="project-progress-list">${stationRows(p).map((st, i, rows) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time><span class="pd-station-edit" role="button" tabindex="0" data-edit-milestone="${esc2(p.id)}|${esc2(st.id)}" aria-label="编辑或删除里程碑" title="编辑或删除（也可右键）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4 9-9 3 3-9 9zM12 5l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>`, st.title, `class="pd-station state-${st.state}" data-last="${i === rows.length - 1}" draggable="true"`)).join("")}</div></section>`;
     const peopleCol = `<section class="project-relations"><header><span>\u76F8\u5173\u4EBA\u5458</span></header><div class="project-people">${HOST.projectPeople ? HOST.projectPeople(p, d, B3) : p.peopleIds.map((id) => {
       const who2 = d.people.find((x2) => x2.id === id);
       return B3("project-person", id, `${a2.initial(who2)}<span>${esc2(who2.name)}</span>`, who2.name, `aria-pressed="${d.ui.projectPerson === id}"`);
@@ -13299,6 +13319,7 @@ function buildModel(index, clock, prev) {
     status: p.status,
     due: p.due || void 0,
     resume: p.resume || void 0,
+    milestoneSort: p.milestoneSort || "",
     completed: p.completed || void 0,
     goalIds: ids(ix.goals, p.goals),
     peopleIds: ids(ix.people, p.people),
@@ -13579,7 +13600,8 @@ function specs(d) {
         people: links2(d.people, p.peopleIds, "name"),
         ideas: links2(d.ideas, p.ideaIds),
         literature: links2(d.literature, p.literatureIds),
-        milestones: (p.stations || []).map((s) => ({ title: s.title, state: s.state, ...(s.date ? { date: s.date } : {}) }))
+        milestones: (p.stations || []).map((s) => ({ title: s.title, state: s.state, ...(s.date ? { date: s.date } : {}) })),
+        milestoneSort: p.milestoneSort || null
       }),
       body: (p) => ({ lead: p.description || "" })
     },
@@ -20660,6 +20682,24 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
     this.registerDomEvent(this.root, "click", e => { if (e.target.closest?.("[data-edit-milestone]")) editMilestone(e); }, { capture: true });
     this.registerDomEvent(this.root, "keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-edit-milestone]")) editMilestone(e); }, { capture: true });
     this.registerDomEvent(this.root, "contextmenu", editMilestone, { capture: true });
+    const stationRow = e => e.target.closest?.(".pd-station[data-id]");
+    const clearDrop = () => this.root.querySelectorAll(".pd-station.is-drop-target").forEach(x => x.classList.remove("is-drop-target"));
+    const parseStation = raw => { const [pid, sid] = String(raw || "").split("|"), n = /^s(\d+)$/.exec(sid || ""); return pid && n ? { pid, n: Number(n[1]) } : null; };
+    this.registerDomEvent(this.root, "dragstart", e => { const row = stationRow(e); if (!row) return; this.dragStation = parseStation(row.dataset.id); e.dataTransfer?.setData("text/plain", row.dataset.id); if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; });
+    this.registerDomEvent(this.root, "dragover", e => { const row = stationRow(e), from = this.dragStation, to = row && parseStation(row.dataset.id); if (!from || !to || from.pid !== to.pid) return; e.preventDefault(); clearDrop(); row.classList.add("is-drop-target"); });
+    this.registerDomEvent(this.root, "dragend", () => { this.dragStation = null; clearDrop(); });
+    this.registerDomEvent(this.root, "drop", e => {
+      const row = stationRow(e), from = this.dragStation, to = row && parseStation(row.dataset.id);
+      this.dragStation = null; clearDrop();
+      if (!from || !to || from.pid !== to.pid) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      moveProjectMilestone(this, p, from.pid, from.n, to.n);
+    }, { capture: true });
+    this.registerDomEvent(this.root, "click", async e => {
+      const b = e.target.closest?.("[data-milestone-auto]"); if (!b) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      try { await p.writer.frontmatter(b.dataset.milestoneAuto, fm => { delete fm.milestoneSort; }); this.schedule(); this.frame.feedback("已改回按状态自动排序"); } catch (error) { this.frame.feedback("操作失败：" + error.message); }
+    }, { capture: true });
     this.registerDomEvent(this.root,"click",e=>{
       const button=e.target.closest?.("[data-edit-project-due]");if(!button)return;
       e.preventDefault();e.stopImmediatePropagation();const input=button.parentElement.querySelector("input");button.hidden=true;input.hidden=false;input.focus();try{input.showPicker?.();}catch(_){}
