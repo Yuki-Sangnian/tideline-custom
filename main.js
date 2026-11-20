@@ -5316,7 +5316,7 @@ var Index = class {
       this.days.set(d, {
         path,
         date: d,
-        schedules: Array.isArray(fm.schedules)?fm.schedules.filter(e=>e&&e.id&&e.start&&e.end).map(e=>({...e,title:String(e.title||"日程")})):[],
+        schedules: Array.isArray(fm.schedules)?fm.schedules.filter(e=>e&&e.id&&e.start&&e.end).map(e=>({...e,title:String(e.title||"日程"),project:e.project?String(e.project).replace(/^\[\[|\]\]$/g,""):"",people:(Array.isArray(e.people)?e.people:e.people?[e.people]:[]).map(n=>String(n).replace(/^\[\[|\]\]$/g,"")).filter(Boolean)})):[],
         habits: fm.habits || {},
         scores: fm.scores || {},
         effort: fm.effort || {},
@@ -5807,7 +5807,7 @@ function dayText(date2, today = "") {
 // src/ui/capture.js
 var TYPES = [["project", "route", "项目"], ["book", "book", "书籍"], ["literature", "note", "文献"], ["idea", "star", "想法"], ["task", "box", "任务"], ["schedule", "calendar", "日程"], ["note", "note", "随手记"], ["achievement", "flag", "成就"], ["gratitude", "heart", "感恩"]];
 var TOKENS = /周[一二三四五六日天]|#[^\s#@]+|@[^\s#@]+/g;
-var CAPTURE_HTML = `<div id="capture" class="capture paper-strip" hidden><div id="capture-types" class="capture-types"></div><form id="capture-form"><textarea id="capture-input" aria-label="记一笔" rows="1" placeholder="Enter 保存，Shift+Enter 换行"></textarea><div id="capture-tokens"></div><div id="capture-schedule" hidden><label>日期<input type="date" id="capture-schedule-date"></label><label>开始<input type="time" id="capture-schedule-start"></label><label>结束<input type="time" id="capture-schedule-end"></label><small>结束早于开始时，按次日结束计算。日程与任务分开记录。</small></div><textarea id="capture-description" aria-label="日程说明（可选）" rows="1" placeholder="日程说明（可选）"></textarea><textarea id="capture-idea-content" hidden rows="4" aria-label="想法内容" placeholder="写下想法的具体内容…（回车保存，Shift＋回车换行）"></textarea></form><button class="icon-button" data-action="capture-save" aria-label="\u8BB0\u4E0B">\u21B5</button></div>`;
+var CAPTURE_HTML = `<div id="capture" class="capture paper-strip" hidden><div id="capture-types" class="capture-types"></div><form id="capture-form"><textarea id="capture-input" aria-label="记一笔" rows="1" placeholder="Enter 保存，Shift+Enter 换行"></textarea><div id="capture-tokens"></div><div id="capture-schedule" hidden><label>日期<input type="date" id="capture-schedule-date"></label><label>开始<input type="time" id="capture-schedule-start"></label><label>结束<input type="time" id="capture-schedule-end"></label><label class="capture-schedule-wide">项目<select id="capture-schedule-project"></select></label><div id="capture-schedule-people" class="schedule-people capture-schedule-wide" aria-label="关联人物"></div><small>结束早于开始时，按次日结束计算。日程与任务分开记录。</small></div><textarea id="capture-description" aria-label="日程说明（可选）" rows="1" placeholder="日程说明（可选）"></textarea><textarea id="capture-idea-content" hidden rows="4" aria-label="想法内容" placeholder="写下想法的具体内容…（回车保存，Shift＋回车换行）"></textarea></form><button class="icon-button" data-action="capture-save" aria-label="\u8BB0\u4E0B">\u21B5</button></div>`;
 var clean = (s) => String(s).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "\u672A\u547D\u540D";
 function openProjectMilestone(view, plugin, path) {
   const project = plugin.index.projects.get(path);
@@ -6028,7 +6028,7 @@ function openTodayInvestments(view, plugin, selectedDate) {
 }
 function createCapture({ view, plugin }) {
   const root = view.root, $5 = (s) => root.querySelector(s);
-  let open = false, type = "task", capSuggest = null;
+  let open = false, type = "task", capSuggest = null, scheduleRead = null;
   function render() {
     capSuggest?.close();
     $5("#capture-types").innerHTML = TYPES.map(([t, ic, name]) => `<button type="button" data-capture-type="${t}" aria-label="${name}" aria-pressed="${t === type}">${icon(ic)}<span class="capture-type-name" aria-hidden="true">${name}</span></button>`).join("");
@@ -6036,6 +6036,8 @@ function createCapture({ view, plugin }) {
     $5("#capture-description").hidden = !["task","schedule"].includes(type);
     $5("#capture-schedule").hidden=type!=="schedule";
     $5("#capture-idea-content").hidden=type!=="idea";
+    if(type!=="schedule")scheduleRead=null;
+    else if(open&&!scheduleRead)scheduleRead=fillScheduleLinks(plugin,$5("#capture-schedule-project"),$5("#capture-schedule-people"));
     if(type==="schedule"&&!$5("#capture-schedule-date").value){$5("#capture-schedule-date").value=plugin.clock().date;$5("#capture-schedule-start").value=plugin.clock().time;$5("#capture-schedule-end").value="";}
     $5("#capture-toggle").setAttribute("aria-expanded", String(open));
     $5("#capture-input").placeholder = { schedule:"写日程名称，如：阅读、开会、散步", book: "输入书名，回车添加到书籍（可用 #标签）", literature: "输入文献标题，回车添加到文献（可用 #标签）", task: "\u8BB0\u4E00\u4EF6\u4EFB\u52A1\uFF0C\u9ED8\u8BA4\u8FDB\u6536\u4EF6\u7BB1\uFF08\u660E\u5929\u3001#\u6E05\u5355\u3001@\u4EBA\u3001!\u9AD8\uFF09", idea: "想法标题（可用 #标签）", note: "\u6B64\u523B\u60F3\u5230\u4E86\u4EC0\u4E48", achievement: "\u4ECA\u5929\u505A\u6210\u4E86\u4EC0\u4E48", gratitude: "\u4ECA\u5929\u611F\u8C22\u4EC0\u4E48", project: "\u65B0\u9879\u76EE\u7684\u540D\u5B57" }[type];
@@ -6078,7 +6080,7 @@ ${line}
       return lines2.join("\n");
     }));
   }
-  async function save(raw, description = "") {
+  async function save(raw, description = "", links = null) {
     const text = raw.trim();
     if (!text) return;
     const { date: date2, time } = plugin.clock(), ix = plugin.index, tokens2 = text.match(TOKENS) || [];
@@ -6088,7 +6090,7 @@ ${line}
       const date=$5("#capture-schedule-date").value,start=$5("#capture-schedule-start").value,end=$5("#capture-schedule-end").value;
       if(!date||!start||!end||start===end){view.frame.feedback("请填写日期及不同的开始、结束时间");return;}
       try{
-        const event={id:crypto.randomUUID(),title:text,start:date+"T"+start,end:(end<start?shiftScheduleDate(date,1):date)+"T"+end,description};
+        const event={id:crypto.randomUUID(),title:text,start:date+"T"+start,end:(end<start?shiftScheduleDate(date,1):date)+"T"+end,description,...scheduleLinkFields(links)};
         await writeDailySchedule(plugin,null,event);view.go("today");view.todayKey=null;view.render(true);view.frame.feedback("已添加日程；点击时间线上的日程可修改时间");
       }catch(error){view.frame.feedback("日程保存失败："+error.message);}
       return;
@@ -6188,12 +6190,14 @@ ${line}
       const date=$5("#capture-schedule-date").value,start=$5("#capture-schedule-start").value,end=$5("#capture-schedule-end").value;
       if(!date||!start||!end||start===end){view.frame.feedback("请填写日期及不同的开始、结束时间");return;}
     }
+    const links = type==="schedule" ? scheduleRead?.() : null;
     input.value = "";
     tokens();
     capSuggest?.close();
     open = false;
     render();
-    await save(v2, description);
+    await save(v2, description, links);
+    scheduleRead = null;
     $5("#capture-description").value = "";
     $5("#capture-idea-content").value = "";
   }
@@ -7058,16 +7062,31 @@ async function writeDailySchedule(plugin,original,event){
   }
   await syncScheduleEffort(plugin,affected);plugin.index.emit();
 }
+function fillScheduleLinks(plugin,select,box,current={}){
+  const ix=plugin.index,projects=[...ix.projects.values()].filter(p=>["active","planned","paused"].includes(p.status)).map(p=>p.title),people=[...ix.people.values()].map(p=>p.name);
+  if(current.project&&!projects.includes(current.project))projects.push(current.project);
+  for(const n of current.people||[])if(!people.includes(n))people.push(n);
+  select.innerHTML="";select.add(new Option("不关联项目",""));for(const n of projects)select.add(new Option(n,n));select.value=current.project||"";
+  const picked=new Set(current.people||[]);box.innerHTML="";
+  if(!people.length){const hint=document.createElement("small");hint.textContent="还没有人物笔记";box.appendChild(hint);}
+  for(const name of people){
+    const b=document.createElement("button");b.type="button";b.className="schedule-person";b.textContent="@"+name;b.setAttribute("aria-pressed",String(picked.has(name)));
+    b.onclick=()=>{picked.has(name)?picked.delete(name):picked.add(name);b.setAttribute("aria-pressed",String(picked.has(name)));};box.appendChild(b);
+  }
+  return ()=>({project:select.value,people:[...picked]});
+}
+function scheduleLinkFields(links){return {...(links?.project?{project:links.project}:{}),...(links?.people?.length?{people:links.people}:{})};}
 function openScheduleEditor(view,plugin,event=null){
   const modal=new import_obsidian7.Modal(plugin.app);modal.titleEl.setText(event?"编辑日程":"添加日程");
   const box=modal.contentEl,field=(label,type,value)=>{const wrap=box.createDiv();wrap.style.cssText="display:grid;grid-template-columns:75px 1fr;gap:10px;align-items:center;margin:10px 0";wrap.createEl("label",{text:label});const input=wrap.createEl("input",{type,value});input.style.width="100%";return input;};
   const title=field("日程","text",event?.title||""),start=field("开始","datetime-local",event?.start||plugin.clock().date+"T"+plugin.clock().time),end=field("结束","datetime-local",event?.end||""),description=field("说明","text",event?.description||"");
+  const linkRow=box.createDiv();linkRow.style.cssText="display:grid;grid-template-columns:75px 1fr;gap:10px;align-items:start;margin:10px 0";linkRow.createEl("label",{text:"项目"});const projectSelect=linkRow.createEl("select");projectSelect.style.width="100%";linkRow.createEl("label",{text:"人物"});const peopleBox=linkRow.createDiv({cls:"schedule-people"});const readLinks=fillScheduleLinks(plugin,projectSelect,peopleBox,event||{});
   const duration=box.createEl("p"),error=box.createEl("p");error.style.color="var(--text-error)";
   const preview=()=>{const h=(Date.parse(end.value)-Date.parse(start.value))/36e5;duration.textContent=Number.isFinite(h)&&h>0?`时长 ${formatEffortHours(h)}h` : "请填写晚于开始的结束时间";};start.oninput=preview;end.oninput=preview;preview();
-  let busy=false;const save=async()=>{if(busy)return;busy=true;try{await writeDailySchedule(plugin,event,{id:event?.scheduleId||crypto.randomUUID(),title:title.value.trim(),start:start.value,end:end.value,description:description.value.trim()});modal.close();view.todayKey=null;view.render(true);}catch(e){error.textContent=e.message;}finally{busy=false;}};
+  let busy=false;const save=async()=>{if(busy)return;busy=true;try{await writeDailySchedule(plugin,event,{id:event?.scheduleId||crypto.randomUUID(),title:title.value.trim(),start:start.value,end:end.value,description:description.value.trim(),...scheduleLinkFields(readLinks())});modal.close();view.todayKey=null;view.render(true);}catch(e){error.textContent=e.message;}finally{busy=false;}};
   const buttons=box.createDiv();buttons.style.cssText="display:flex;gap:12px;margin-top:16px";buttons.createEl("button",{text:"保存",cls:"mod-cta"}).onclick=save;
   if(event)buttons.createEl("button",{text:"删除日程"}).onclick=async()=>{if(busy)return;busy=true;try{await writeDailySchedule(plugin,event,null);modal.close();view.todayKey=null;view.render(true);}catch(e){error.textContent=e.message;busy=false;}};
-  box.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();save();}});modal.open();
+  box.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing&&!e.target.closest?.(".schedule-person")&&e.target.tagName!=="SELECT"){e.preventDefault();save();}});modal.open();
 }
 function installScheduleEditing(view,plugin){
   view.registerDomEvent(view.root,"click",e=>{
@@ -9690,7 +9709,7 @@ ${t.markdown ?? t.description ?? ""}`)}</pre>` : ""}</article>`;
     fitList();
     if(f.kind==="schedule"){
       const entries=(d.schedules||[]).filter(e=>Date.parse(e.end)>Date.now()),left=root.querySelector(".cargo-left-pane"),right=root.querySelector(".cargo-detail-pane");
-      left.innerHTML=`<header class="schedule-list-heading"><strong>日程</strong><button type="button" data-new-schedule aria-label="添加日程">＋</button></header><div class="cargo-manifest schedule-manifest">${entries.map(e=>`<button type="button" class="schedule-list-row" data-edit-schedule="${esc2(e.key)}"><time>${esc2(e.start.slice(0,10))}<br>${esc2(e.start.slice(11,16))} – ${esc2(e.end.slice(0,10)!==e.start.slice(0,10)?"次日 ":"")}${esc2(e.end.slice(11,16))}</time><span>${esc2(e.title)}</span></button>`).join("")||'<p>暂无接下来的日程。点击＋或使用“记录 → 日程”添加。</p>'}</div>`;
+      left.innerHTML=`<header class="schedule-list-heading"><strong>日程</strong><button type="button" data-new-schedule aria-label="添加日程">＋</button></header><div class="cargo-manifest schedule-manifest">${entries.map(e=>`<button type="button" class="schedule-list-row" data-edit-schedule="${esc2(e.key)}"><time>${esc2(e.start.slice(0,10))}<br>${esc2(e.start.slice(11,16))} – ${esc2(e.end.slice(0,10)!==e.start.slice(0,10)?"次日 ":"")}${esc2(e.end.slice(11,16))}</time><span>${esc2(e.title)}${e.project||e.people?.length?`<small>${esc2([e.project?"项目 · "+e.project:"",...(e.people||[]).map(n=>"@"+n)].filter(Boolean).join("　"))}</small>`:""}</span></button>`).join("")||'<p>暂无接下来的日程。点击＋或使用“记录 → 日程”添加。</p>'}</div>`;
       right.innerHTML='<section class="schedule-explanation"><h3>按时间安排，按实际经过统计</h3><p>日程独立于任务。点击一条安排修改起止时间，也可在今日时间线上修改。</p><p>未来日程暂不计投入；进行中按已过时间累计；结束后计入完整时长。</p></section>';
     }
     root.querySelector(".cargo-manifest").scrollTop = scroll;
