@@ -5174,7 +5174,7 @@ var Index = class {
         people: links(fm.people),
         ideas: links(fm.ideas),
         literature: links(fm.literature),
-        milestones: (fm.milestones || []).map((m2) => ({ title: String(m2.title), state: m2.state || "open" })),
+        milestones: (fm.milestones || []).map((m2) => ({ title: String(m2.title), state: m2.state || "open", date: /^\d{4}-\d{2}-\d{2}/.test(String(m2.date || "")) ? String(m2.date).slice(0, 10) : "" })),
         description: firstPara(text)
       });
       return;
@@ -5824,6 +5824,10 @@ function openProjectMilestone(view, plugin, path, index = null) {
     const state = label.createEl("select"); state.setAttribute("aria-label", "里程碑状态");
     for (const [value, text] of [["open", "未开始"], ["in_progress", "进行中"], ["done", "已完成"]]) state.createEl("option", { value, text });
     if (current) state.value = current.state || "open";
+    const dateLabel = el.createEl("label", { text: "完成日期 " }); dateLabel.style.cssText = "display:block;margin-top:12px";
+    const doneDate = dateLabel.createEl("input", { type: "date" }); doneDate.setAttribute("aria-label", "里程碑完成日期"); doneDate.value = current?.date || "";
+    const syncDate = () => { dateLabel.hidden = state.value !== "done"; if (state.value === "done" && !doneDate.value) doneDate.value = plugin.clock().date; };
+    state.addEventListener("change", syncDate); syncDate();
     const error = el.createEl("p"); error.setAttribute("role", "alert"); error.style.color = "var(--text-error)";
     const actions = el.createDiv(); actions.style.cssText = "display:flex;justify-content:flex-end;gap:10px;margin-top:16px";
     if (current) {
@@ -5849,8 +5853,8 @@ function openProjectMilestone(view, plugin, path, index = null) {
       try {
         await plugin.writer.frontmatter(path, fm => {
           const entries = Array.isArray(fm.milestones) ? [...fm.milestones] : [];
-          if (current) { if (entries[index] && String(entries[index].title) === current.title) entries[index] = { ...entries[index], title, state: state.value }; else throw new Error("里程碑已被改动，请刷新后再试"); fm.milestones = entries; }
-          else fm.milestones = [...entries, { title, state: state.value }];
+          if (current) { if (entries[index] && String(entries[index].title) === current.title) { const next = { ...entries[index], title, state: state.value }; if (state.value === "done" && doneDate.value) next.date = doneDate.value; else delete next.date; entries[index] = next; } else throw new Error("里程碑已被改动，请刷新后再试"); fm.milestones = entries; }
+          else fm.milestones = [...entries, { title, state: state.value, ...(state.value === "done" && doneDate.value ? { date: doneDate.value } : {}) }];
         });
         modal.close(); view.schedule(); view.frame.feedback((current ? "已保存里程碑：" : "已添加里程碑：") + title);
       } catch (e) { error.textContent = (current ? "保存失败：" : "添加失败：") + e.message; save.disabled = false; }
@@ -10454,6 +10458,11 @@ function projectPage(a2) {
   function compareProjectTasks(a,b) {
     return Number(a.status==="done")-Number(b.status==="done") || (a.date||"9999-12-31").localeCompare(b.date||"9999-12-31") || a.title.localeCompare(b.title,"zh-Hans-u-co-pinyin",{numeric:true,sensitivity:"base"});
   }
+  // 里程碑从下往上推进：已完成在最下面（最早完成的最靠下），进行中在中间，未开始在最上面（越靠后的越靠上）
+  const stationRows = (p) => p.stations.map((st, i) => ({ ...st, order: i })).sort((a, b) => {
+    const rank = { open: 0, in_progress: 1, done: 2 };
+    return rank[a.state] - rank[b.state] || (a.state === "done" ? (b.date || "").localeCompare(a.date || "") : 0) || b.order - a.order;
+  });
   const linkToggle = (kind, glyph, label, n) => {
     const open = !!d.ui.projectLinksOpen?.[kind];
     return B3("project-links-toggle", kind, glyph, (open ? "\u6536\u8D77" : "\u5C55\u5F00") + label, `class="pd-link-toggle" aria-expanded="${open}"`) + `<span class="pd-label">${label}</span><span class="mono pd-count">${n}</span>${n ? `<span class="pd-fold-mark" aria-hidden="true">${open ? "\u25BE" : "\u25B8"}</span>` : ""}`;
@@ -10463,7 +10472,7 @@ function projectPage(a2) {
     const menu = d.ui.projectMenu ? `<div class="project-status-menu hand-popup" role="group" aria-label="\u9879\u76EE\u72B6\u6001">${statuses.map(([status, glyph, label]) => B3("project-status", status, G3(glyph) + `<span>${label}</span>`, label, `aria-pressed="${p.status === status}"`)).join("")}</div>` : "";
     const head = `<div class="pd-head"><div class="pd-title">${chart.ship(52, true)}<div class="pd-title-text"><div class="pd-title-row"><h3>${esc2(p.title)}</h3><span class="pd-status">${statusLabel(p.status)}</span>${p.resume ? `<time>${fmt(p.resume)}</time>` : ""}<span class="project-due-field"><button type="button" data-edit-project-due aria-label="${p.due ? "修改截止日期" : "设置截止日期"}" title="设置截止日期">${icon2("calendar",15)}${p.due ? `<time>${esc2(p.due)}</time>` : ""}</button><input hidden type="date" data-project-due="${esc2(p.id)}" aria-label="项目截止日期" value="${esc2(p.due || "")}"></span></div>${p.description ? `<p>${esc2(p.description)}</p>` : ""}</div><div class="project-detail-top">${B3("project-close", "", G3("left"), "\u6298\u56DE\u6D77\u56FE")}${B3("project-status-menu", "", G3(statuses.find((s) => s[0] === p.status)[1]), "\u66F4\u6539\u9879\u76EE\u72B6\u6001")}${B3("project-source", "", G3("corner"), "\u5C55\u5F00\u9879\u76EE Markdown")}${menu}</div></div><div class="pd-links"><div class="pd-link">${G3("goal")}<span class="pd-label">\u5173\u8054\u76EE\u6807</span>${HOST.projectGoalChips ? HOST.projectGoalChips(p, d, B3) : p.goalIds.map((id) => B3("open-object", id, esc2(d.goals.find((x2) => x2.id === id).title), d.goals.find((x2) => x2.id === id).title, 'data-kind="goal" class="pd-chip"')).join("")}</div><div class="pd-link">${linkToggle("ideas", icon2("star"), "\u76F8\u5173\u60F3\u6CD5", ideas.length)}${ideas.length && d.ui.projectLinksOpen?.ideas ? ideas.map((x2) => B3("open-object", x2.id, "\u201C" + esc2(x2.title) + "\u201D", x2.title, 'data-kind="idea" class="pd-quote"')).join("") : ""}</div><div class="pd-link">${linkToggle("lits", icon2("book"), "\u76F8\u5173\u6587\u732E", lits.length)}${lits.length && d.ui.projectLinksOpen?.lits ? lits.map((x2) => B3("open-object", x2.id, esc2(x2.title), x2.title, 'data-kind="literature" class="pd-quote"')).join("") : ""}</div></div></div>`;
     const taskCol = `<section class="pd-tasks"><header><span>\u4EFB\u52A1</span><span class="mono">${done2}/${tasks.length}</span><span class="pd-bar" aria-hidden="true">${svg3(ink2([[2, 4], [158, 4]], 1, a2.TICK) + (bar ? ink2([[2, 4], [2 + 156 * bar, 4]], 2.4, NOW) : ""), 160, 8)}</span></header><div class="project-task-list">${tasks.map((t) => `<div class="project-task-row ${t.status==='done'?'is-completed':''}">${B3("project-task-complete", t.id, stateMark(t.status), "\u5B8C\u6210 " + t.title)}${B3("open-object", t.id, esc2(t.title), "\u6253\u5F00\u4EFB\u52A1 " + t.title, 'data-kind="task"')}<time class="mono ${t.date === d.clock.date ? "is-today" : ""}">${md7(t.date)}</time></div>`).join("") || '<p class="pd-empty">\u8FD8\u6CA1\u6709\u4EFB\u52A1</p>'}</div>${HOST.projectTaskAdd?.(p, d) || ""}${scheduleLinkedSection((d.schedules||[]).filter(e=>e.project===p.title))}</section>`;
-    const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button></header><div class="project-progress-list">${p.stations.map((st, i) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time><span class="pd-station-edit" role="button" tabindex="0" data-edit-milestone="${esc2(p.id)}|${esc2(st.id)}" aria-label="编辑或删除里程碑" title="编辑或删除（也可右键）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4 9-9 3 3-9 9zM12 5l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>`, st.title, `class="pd-station state-${st.state}" data-last="${i === p.stations.length - 1}"`)).join("")}</div></section>`;
+    const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button></header><div class="project-progress-list">${stationRows(p).map((st, i, rows) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time><span class="pd-station-edit" role="button" tabindex="0" data-edit-milestone="${esc2(p.id)}|${esc2(st.id)}" aria-label="编辑或删除里程碑" title="编辑或删除（也可右键）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4 9-9 3 3-9 9zM12 5l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>`, st.title, `class="pd-station state-${st.state}" data-last="${i === rows.length - 1}"`)).join("")}</div></section>`;
     const peopleCol = `<section class="project-relations"><header><span>\u76F8\u5173\u4EBA\u5458</span></header><div class="project-people">${HOST.projectPeople ? HOST.projectPeople(p, d, B3) : p.peopleIds.map((id) => {
       const who2 = d.people.find((x2) => x2.id === id);
       return B3("project-person", id, `${a2.initial(who2)}<span>${esc2(who2.name)}</span>`, who2.name, `aria-pressed="${d.ui.projectPerson === id}"`);
@@ -10512,6 +10521,8 @@ ${p.stations.map((s) => "- [" + (s.state === "done" ? "x" : s.state === "in_prog
     } else if (key === "project-station") {
       const [pid, sid] = id.split("|"), station = d.projects.find((p2) => p2.id === pid).stations.find((s) => s.id === sid);
       station.state = { open: "in_progress", in_progress: "done", done: "open" }[station.state];
+      if (station.state === "done" && !station.date) station.date = d.clock.date;
+      else if (station.state === "open") station.date = "";
     } else if (key === "project-links-toggle") d.ui.projectLinksOpen = { ...d.ui.projectLinksOpen, [id]: !d.ui.projectLinksOpen?.[id] };
     else if (key === "project-person") d.ui.projectPerson = d.ui.projectPerson === id ? null : id;
     else if (key === "project-source") d.ui.projectSource = !d.ui.projectSource;
@@ -13293,7 +13304,7 @@ function buildModel(index, clock, prev) {
     peopleIds: ids(ix.people, p.people),
     ideaIds: ids(ix.ideas, p.ideas),
     literatureIds: ids(ix.literature, p.literature),
-    stations: p.milestones.map((m2, i) => ({ id: "s" + i, title: m2.title, state: m2.state })),
+    stations: p.milestones.map((m2, i) => ({ id: "s" + i, title: m2.title, state: m2.state, date: m2.date || "" })),
     description: p.description,
     example: ex(p.id)
   }));
@@ -13568,7 +13579,7 @@ function specs(d) {
         people: links2(d.people, p.peopleIds, "name"),
         ideas: links2(d.ideas, p.ideaIds),
         literature: links2(d.literature, p.literatureIds),
-        milestones: (p.stations || []).map((s) => ({ title: s.title, state: s.state }))
+        milestones: (p.stations || []).map((s) => ({ title: s.title, state: s.state, ...(s.date ? { date: s.date } : {}) }))
       }),
       body: (p) => ({ lead: p.description || "" })
     },
