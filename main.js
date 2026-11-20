@@ -11751,7 +11751,7 @@ ${item.conclusion}`)}</pre>` : ""}
         e.stopImmediatePropagation();
         app.workspace.openLinkText(link.dataset.href || link.getAttribute("href"), source, e.metaKey || e.ctrlKey);
       }, { capture: true });
-      import_obsidian7.MarkdownRenderer.render(app, markdown, el, source, component).then(() => foldParas(el)).catch((error) => {
+      import_obsidian7.MarkdownRenderer.render(app, markdown, el, source, component).then(() => { foldParas(el); if (view() === "shelf") requestAnimationFrame(() => fitShelf(root)); }).catch((error) => {
         if (el.isConnected) el.textContent = markdown;
         console.error("Tideline library reading", error);
       });
@@ -11761,7 +11761,7 @@ ${item.conclusion}`)}</pre>` : ""}
     const m2 = meta(kind, item), sub = d.ui.librarySub || "abstract", links2 = item.projectIds.map((id) => a2.project(id));
     const entryLabel={abstract:"关键信息",note:"我的笔记",marks:"我的标注",related:"相关内容"}[sub]||"我的笔记";
     const body = sub === "abstract" ? `<h4>\u6458\u8981</h4>${readingBox("abstract", m2.abstract, item.id)}<h4>\u5173\u952E\u4FE1\u606F</h4><ul class="lib-points">${m2.points.map(([k2, v2], i) => `<li data-lib-pt="${i}">${[icon2("note"), G3("goal"), icon2("route")][i%3]}<div class="lib-point"><span class="lib-point-text"><b>${esc2(k2)}</b>${esc2(v2)}</span></div></li>`).join("")}</ul>` : sub === "marks" ? `<h4>\u6807\u6CE8</h4><ul class="lib-marks">${m2.marks.map((x2, i3) => `<li>${readingBox("mark" + i3, x2, item.id)}</li>`).join("")}</ul>` : sub === "related" ? `<h4>\u76F8\u5173</h4>${m2.relatedNotes ? readingBox("related", m2.relatedNotes, item.id) : ""}<ul class="lib-related">${related(kind, item).map(([k2, x2]) => `<li>${B3("library-pick", k2 + "|" + x2.id, icon2("note") + `<span>${esc2(x2.title)}</span><small>${esc2(meta(k2, x2).authors)} \xB7 ${meta(k2, x2).year}</small>`, x2.title)}</li>`).join("") || '<li class="lib-none">\u6682\u65E0</li>'}</ul>` : `<h4>${B3("library-edit-note","","笔记","编辑已有笔记",'class="lib-note-edit-title"')}</h4>${d.ui.libraryEditingNote?`<form data-p2-form="library-note-edit" class="lib-existing-note-editor"><textarea name="note" rows="10" aria-label="编辑已有笔记，回车保存，Shift加回车换行">${esc2(m2.note||"")}</textarea><small>回车保存 · Shift＋回车换行</small></form>`:`${m2.note ? readingBox("note", m2.note, item.id) : '<p class="lib-abstract"><span class="lib-none">还没有笔记。</span></p>'}`}`;
-    return `<section class="lib-record hand-panel"><div class="lib-record-scroll"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3>${inlineField("title", item.title)}</h3><div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>${kind === "book" ? "打开书籍" : "打开文献"}</span>`, kind === "book" ? "打开书籍" : "打开文献", 'class="lib-pdf"')}</div></header>
+    return `<section class="lib-record hand-panel"><header><div class="lib-record-heading">${B3("library-view","sea",G3("left"),"返回深海",'class="lib-record-back" title="返回深海"')}<div><h3 class="lib-title${d.ui.libraryTitleOpen === item.id ? " is-open" : ""}">${inlineField("title", item.title)}</h3>${B3("library-title-toggle", item.id, d.ui.libraryTitleOpen === item.id ? "收起 △" : "展开 ▽", d.ui.libraryTitleOpen === item.id ? "收起标题" : "展开完整标题", 'class="lib-title-toggle" hidden')}<div class="lib-meta">${inlineField("authors",m2.authors)} · ${inlineField("year",m2.year)} · ${inlineField("type",m2.type)}</div></div></div><div class="lib-record-actions">${favoriteButton(kind,item)}${B3("library-source", "", G3("corner"), "\u5C55\u5F00\u7B14\u8BB0 Markdown")}${B3("library-pdf", "", `${icon2("book")}<span>${kind === "book" ? "打开书籍" : "打开文献"}</span>`, kind === "book" ? "打开书籍" : "打开文献", 'class="lib-pdf"')}</div></header>
  <div class="lib-tags">${m2.keywords.map((k2) => `<span class="lib-chip hand-pill">${esc2(k2)}</span>`).join("")}</div>
  <div class="lib-subtabs" role="tablist">${[["abstract", "\u6458\u8981"], ["note", "\u7B14\u8BB0"], ["marks", `\u6807\u6CE8 (${m2.marks.length})`], ["related", `\u76F8\u5173 (${related(kind, item).length+(m2.relatedNotes||"").split(/\n+/).filter(Boolean).length})`]].map(([k2, l2]) => B3("library-sub", k2, l2, l2, `role="tab" aria-selected="${sub === k2}"`)).join("")}</div>
  <div class="lib-record-body">${body}${d.ui.librarySource ? `<pre class="markdown-preview">${esc2(`---
@@ -11771,7 +11771,7 @@ title: ${item.title}
 stage:: ${item.stage}
 
 ${item.conclusion}`)}</pre>` : ""}</div>
- <form class="lib-note" data-p2-form="library-note" data-library-section="${sub}"><h4>${entryLabel}</h4><textarea name="note" rows="3" placeholder="${esc2({abstract:"添加关键信息，可写成：观点：内容",note:"写下新增笔记…",marks:"写下摘录或标注…",related:"添加相关内容，支持 [[笔记名]] 链接…"}[sub])}" aria-label="\u6211\u7684\u7B14\u8BB0"></textarea><div class="lib-note-bar"><span>${[["B", "b", "加粗"], ["I", "i", "斜体"], ["\u2261", "list", "项目列表"], ["\u2197", "link", "插入 [[笔记链接]]"]].map(([x2, k2, l2]) => `<button type="button" class="lib-fmt" data-lib-fmt="${k2}" aria-label="${l2}" title="${l2}">${x2}</button>`).join("")}</span><small class="lib-note-key-hint">回车保存 · Shift＋回车换行</small></div></form></div></section>`;
+ <form class="lib-note" data-p2-form="library-note" data-library-section="${sub}"><h4>${entryLabel}</h4><textarea name="note" rows="3" placeholder="${esc2({abstract:"添加关键信息，可写成：观点：内容",note:"写下新增笔记…",marks:"写下摘录或标注…",related:"添加相关内容，支持 [[笔记名]] 链接…"}[sub])}" aria-label="\u6211\u7684\u7B14\u8BB0"></textarea><div class="lib-note-bar"><span>${[["B", "b", "加粗"], ["I", "i", "斜体"], ["\u2261", "list", "项目列表"], ["\u2197", "link", "插入 [[笔记链接]]"]].map(([x2, k2, l2]) => `<button type="button" class="lib-fmt" data-lib-fmt="${k2}" aria-label="${l2}" title="${l2}">${x2}</button>`).join("")}</span><small class="lib-note-key-hint">回车保存 · Shift＋回车换行</small></div></form></section>`;
   }
   function related(kind, item) {
     const out = [];
@@ -11800,12 +11800,19 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     const root = $5("#library"), w2 = root.clientWidth, h = root.clientHeight, mode2 = view();
     root.dataset.libraryView = mode2;
     root.classList.toggle("has-library-detail", mode2 === "sea" && !!d.ui.librarySelected);
-    d.cache.libraryRendered = mode2 + w2 + "x" + h;
+    d.cache.libraryRendered = mode2 === "shelf" ? mode2 + w2 : mode2 + w2 + "x" + h;
     root.innerHTML = (mode2 === "shelf" ? shelfPage() : seaPage(root, w2, h)) + `<div id="library-gloss" class="library-gloss hand-popup" role="tooltip" hidden></div><span id="library-knot-label" class="library-knot-label" hidden></span>`;
     const editor=$5('[data-p2-form="library-field"]');
     if(editor)editor.dataset.initial=fieldSnapshot(editor);
     searchResults();
     paintReading(root);
+    if (mode2 === "shelf") requestAnimationFrame(() => fitShelf(root));
+  }
+  // 书架页：标题超过三行才露出「展开 / 收起」；页面高度跟着内容走，底下的海底风景跟着挪到最下面
+  function fitShelf(root) {
+    const title = root.querySelector(".lib-record h3.lib-title"), btn = root.querySelector(".lib-title-toggle");
+    if (title && btn) btn.hidden = !(title.classList.contains("is-open") || title.scrollHeight > title.clientHeight + 2);
+    a2.drawScenery?.();
   }
   // 笔记输入框下面的 B / I / 列表 / 链接：给选中的文字加格式（没选中就在光标处插入），光标和选区不会丢
   // 写关键词 / 标签时，边打字边列出知识库里已有的（避免同一个词写成不一样的）：按 ↓ / Tab / 点击选一个，不选就照你打的写；回车仍然是保存
@@ -11915,6 +11922,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
       const [kind,pid]=id.split("|");d.ui.librarySelected={kind,id:pid};d.ui.libraryTab=kind;d.ui.libraryFilter=null;d.ui.libraryEditing=null;d.ui.librarySearchClosed=true;
     }
     else if(key === "library-edit-note") {d.ui.libraryEditingNote=true;d.ui.librarySub="note";}
+    else if (key === "library-title-toggle") d.ui.libraryTitleOpen = d.ui.libraryTitleOpen === id ? null : id;
     else if (key === "library-edit-field") { d.ui.libraryEditing = id; }
     else if (key === "library-edit-cancel") { d.ui.libraryEditing = null; }
     else if (key === "library-notes-toggle") {
@@ -12262,7 +12270,7 @@ ${item.conclusion}`)}</pre>` : ""}</div>
   function scenery(box2) {
     const w2 = box2.width, h = box2.scroll ? box2.height : Math.min(box2.height, HOST.bottom - box2.top);
     const root = $5("#library");
-    if (root && d.cache.libraryRendered !== view() + root.clientWidth + "x" + root.clientHeight) render();
+    if (root && d.cache.libraryRendered !== (view() === "shelf" ? "shelf" + root.clientWidth : view() + root.clientWidth + "x" + root.clientHeight)) render();
     return view() === "shelf" ? shelfScenery(w2, h) : seaScenery(w2, h);
   }
   return {
@@ -21167,6 +21175,11 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       box2.scroll = true;
     }
     if (box2 && this.page === "library") {
+      const shelfPage = this.root.querySelector("#library");
+      if (HOST.paper?.data?.ui?.libraryView === "shelf" && shelfPage && shelfPage.offsetTop + shelfPage.offsetHeight > box2.height) {
+        box2.height = shelfPage.offsetTop + shelfPage.offsetHeight;
+        box2.scroll = true;
+      }
       const sea = HOST.paper?.data?.ui?.libraryView !== "shelf" ? HOST.paper?.data?.cache?.librarySea : null, page = this.root.querySelector("#library");
       if (sea && page && sea.H > box2.height - page.offsetTop) {
         box2.height = page.offsetTop + sea.H;
