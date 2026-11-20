@@ -4238,3 +4238,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .linked-schedules .schedule-linked-row.is-past{opacity:.55}
 .compass-root .pd-sub-schedules{display:flex;justify-content:space-between;align-items:baseline;margin-top:18px}
 .compass-root .goal-schedules{align-items:flex-start}
+
+.compass-root #projects .pd-stations .project-progress-list > button.pd-station{grid-template-columns:18px 1fr auto auto}
+.compass-root .pd-station-edit{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;opacity:0;color:var(--secondary);cursor:pointer}
+.compass-root .pd-station:hover .pd-station-edit,.compass-root .pd-station:focus-within .pd-station-edit,.compass-root .pd-station-edit:focus{opacity:.8}
+.compass-root .pd-station-edit:hover{opacity:1;background:color-mix(in srgb,var(--tick) 25%,transparent)}
+.compass-root .pd-station-edit svg{width:13px!important;height:13px!important;background:none!important}

@@ -5809,34 +5809,51 @@ var TYPES = [["project", "route", "项目"], ["book", "book", "书籍"], ["liter
 var TOKENS = /周[一二三四五六日天]|#[^\s#@]+|@[^\s#@]+/g;
 var CAPTURE_HTML = `<div id="capture" class="capture paper-strip" hidden><div id="capture-types" class="capture-types"></div><form id="capture-form"><textarea id="capture-input" aria-label="记一笔" rows="1" placeholder="Enter 保存，Shift+Enter 换行"></textarea><div id="capture-tokens"></div><div id="capture-schedule" hidden><label>日期<input type="date" id="capture-schedule-date"></label><label>开始<input type="time" id="capture-schedule-start"></label><label>结束<input type="time" id="capture-schedule-end"></label><label class="capture-schedule-wide">项目<select id="capture-schedule-project"></select></label><div id="capture-schedule-people" class="schedule-people capture-schedule-wide" aria-label="关联人物"></div><small>结束早于开始时，按次日结束计算。日程与任务分开记录。</small></div><textarea id="capture-description" aria-label="日程说明（可选）" rows="1" placeholder="日程说明（可选）"></textarea><textarea id="capture-idea-content" hidden rows="4" aria-label="想法内容" placeholder="写下想法的具体内容…（回车保存，Shift＋回车换行）"></textarea></form><button class="icon-button" data-action="capture-save" aria-label="\u8BB0\u4E0B">\u21B5</button></div>`;
 var clean = (s) => String(s).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "\u672A\u547D\u540D";
-function openProjectMilestone(view, plugin, path) {
-  const project = plugin.index.projects.get(path);
+function openProjectMilestone(view, plugin, path, index = null) {
+  const project = plugin.index.projects.get(path), current = index != null ? project?.milestones?.[index] : null;
   if (!project) { view.frame.feedback("请先选择一个项目"); return; }
+  if (index != null && !current) { view.frame.feedback("找不到这个里程碑，请刷新后再试"); return; }
   const modal = new import_obsidian7.Modal(plugin.app);
   modal.onOpen = () => {
     const el = modal.contentEl;
-    el.createEl("h2", { text: "添加里程碑" });
+    el.createEl("h2", { text: current ? "编辑里程碑" : "添加里程碑" });
     el.createEl("p", { text: project.title });
     const name = el.createEl("input", { type: "text", placeholder: "例如：完成第一期录音" });
-    name.setAttribute("aria-label", "里程碑名称"); name.style.width = "100%";
+    name.setAttribute("aria-label", "里程碑名称"); name.style.width = "100%"; if (current) name.value = current.title;
     const label = el.createEl("label", { text: "状态 " }); label.style.cssText = "display:block;margin-top:16px";
     const state = label.createEl("select"); state.setAttribute("aria-label", "里程碑状态");
     for (const [value, text] of [["open", "未开始"], ["in_progress", "进行中"], ["done", "已完成"]]) state.createEl("option", { value, text });
+    if (current) state.value = current.state || "open";
     const error = el.createEl("p"); error.setAttribute("role", "alert"); error.style.color = "var(--text-error)";
     const actions = el.createDiv(); actions.style.cssText = "display:flex;justify-content:flex-end;gap:10px;margin-top:16px";
+    if (current) {
+      const del = actions.createEl("button", { text: "删除里程碑", cls: "mod-warning" }); del.style.marginRight = "auto";
+      del.onclick = async () => {
+        del.disabled = true;
+        try {
+          await plugin.writer.frontmatter(path, fm => {
+            const entries = Array.isArray(fm.milestones) ? [...fm.milestones] : [];
+            if (entries[index] && String(entries[index].title) === current.title) entries.splice(index, 1);
+            fm.milestones = entries;
+          });
+          modal.close(); view.schedule(); view.frame.feedback("已删除里程碑：" + current.title);
+        } catch (e) { error.textContent = "删除失败：" + e.message; del.disabled = false; }
+      };
+    }
     actions.createEl("button", { text: "取消" }).onclick = () => modal.close();
-    const save = actions.createEl("button", { text: "添加", cls: "mod-cta" });
+    const save = actions.createEl("button", { text: current ? "保存" : "添加", cls: "mod-cta" });
     save.onclick = async () => {
       const title = name.value.trim();
       if (!title) { error.textContent = "请填写里程碑名称"; name.focus(); return; }
       save.disabled = true;
       try {
         await plugin.writer.frontmatter(path, fm => {
-          const entries = Array.isArray(fm.milestones) ? fm.milestones : [];
-          fm.milestones = [...entries, { title, state: state.value }];
+          const entries = Array.isArray(fm.milestones) ? [...fm.milestones] : [];
+          if (current) { if (entries[index] && String(entries[index].title) === current.title) entries[index] = { ...entries[index], title, state: state.value }; else throw new Error("里程碑已被改动，请刷新后再试"); fm.milestones = entries; }
+          else fm.milestones = [...entries, { title, state: state.value }];
         });
-        modal.close(); view.schedule(); view.frame.feedback("已添加里程碑：" + title);
-      } catch (e) { error.textContent = "添加失败：" + e.message; save.disabled = false; }
+        modal.close(); view.schedule(); view.frame.feedback((current ? "已保存里程碑：" : "已添加里程碑：") + title);
+      } catch (e) { error.textContent = (current ? "保存失败：" : "添加失败：") + e.message; save.disabled = false; }
     };
     name.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); if (!save.disabled) save.click(); } });
     name.focus();
@@ -10442,7 +10459,7 @@ function projectPage(a2) {
     const menu = d.ui.projectMenu ? `<div class="project-status-menu hand-popup" role="group" aria-label="\u9879\u76EE\u72B6\u6001">${statuses.map(([status, glyph, label]) => B3("project-status", status, G3(glyph) + `<span>${label}</span>`, label, `aria-pressed="${p.status === status}"`)).join("")}</div>` : "";
     const head = `<div class="pd-head"><div class="pd-title">${chart.ship(52, true)}<div class="pd-title-text"><div class="pd-title-row"><h3>${esc2(p.title)}</h3><span class="pd-status">${statusLabel(p.status)}</span>${p.resume ? `<time>${fmt(p.resume)}</time>` : ""}<span class="project-due-field"><button type="button" data-edit-project-due aria-label="${p.due ? "修改截止日期" : "设置截止日期"}" title="设置截止日期">${icon2("calendar",15)}${p.due ? `<time>${esc2(p.due)}</time>` : ""}</button><input hidden type="date" data-project-due="${esc2(p.id)}" aria-label="项目截止日期" value="${esc2(p.due || "")}"></span></div>${p.description ? `<p>${esc2(p.description)}</p>` : ""}</div><div class="project-detail-top">${B3("project-close", "", G3("left"), "\u6298\u56DE\u6D77\u56FE")}${B3("project-status-menu", "", G3(statuses.find((s) => s[0] === p.status)[1]), "\u66F4\u6539\u9879\u76EE\u72B6\u6001")}${B3("project-source", "", G3("corner"), "\u5C55\u5F00\u9879\u76EE Markdown")}${menu}</div></div><div class="pd-links"><div class="pd-link">${G3("goal")}<span class="pd-label">\u5173\u8054\u76EE\u6807</span>${HOST.projectGoalChips ? HOST.projectGoalChips(p, d, B3) : p.goalIds.map((id) => B3("open-object", id, esc2(d.goals.find((x2) => x2.id === id).title), d.goals.find((x2) => x2.id === id).title, 'data-kind="goal" class="pd-chip"')).join("")}</div><div class="pd-link">${icon2("star")}<span class="pd-label">\u76F8\u5173\u60F3\u6CD5</span><span class="mono pd-count">${ideas.length}</span>${ideas[0] ? B3("open-object", ideas[0].id, "\u201C" + esc2(ideas[0].title) + "\u201D", ideas[0].title, 'data-kind="idea" class="pd-quote"') : ""}</div><div class="pd-link">${icon2("book")}<span class="pd-label">\u76F8\u5173\u6587\u732E</span><span class="mono pd-count">${lits.length}</span>${lits[0] ? B3("open-object", lits[0].id, esc2(lits[0].title), lits[0].title, 'data-kind="literature" class="pd-quote"') : ""}</div></div></div>`;
     const taskCol = `<section class="pd-tasks"><header><span>\u4EFB\u52A1</span><span class="mono">${done2}/${tasks.length}</span><span class="pd-bar" aria-hidden="true">${svg3(ink2([[2, 4], [158, 4]], 1, a2.TICK) + (bar ? ink2([[2, 4], [2 + 156 * bar, 4]], 2.4, NOW) : ""), 160, 8)}</span></header><div class="project-task-list">${tasks.map((t) => `<div class="project-task-row ${t.status==='done'?'is-completed':''}">${B3("project-task-complete", t.id, stateMark(t.status), "\u5B8C\u6210 " + t.title)}${B3("open-object", t.id, esc2(t.title), "\u6253\u5F00\u4EFB\u52A1 " + t.title, 'data-kind="task"')}<time class="mono ${t.date === d.clock.date ? "is-today" : ""}">${md7(t.date)}</time></div>`).join("") || '<p class="pd-empty">\u8FD8\u6CA1\u6709\u4EFB\u52A1</p>'}</div>${HOST.projectTaskAdd?.(p, d) || ""}${scheduleLinkedSection((d.schedules||[]).filter(e=>e.project===p.title))}</section>`;
-    const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button></header><div class="project-progress-list">${p.stations.map((st, i) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time>`, st.title, `class="pd-station state-${st.state}" data-last="${i === p.stations.length - 1}"`)).join("")}</div></section>`;
+    const stationCol = `<section class="pd-stations"><header><button type="button" data-add-milestone data-project="${esc2(p.id)}" aria-label="添加里程碑" title="添加里程碑">里程碑航程</button></header><div class="project-progress-list">${p.stations.map((st, i) => B3("project-station", p.id + "|" + st.id, chart.dot(st.state, true) + `<span>${esc2(st.title)}</span><time class="mono">${md7(st.date)}</time><span class="pd-station-edit" role="button" tabindex="0" data-edit-milestone="${esc2(p.id)}|${esc2(st.id)}" aria-label="编辑或删除里程碑" title="编辑或删除（也可右键）"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4 9-9 3 3-9 9zM12 5l3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span>`, st.title, `class="pd-station state-${st.state}" data-last="${i === p.stations.length - 1}"`)).join("")}</div></section>`;
     const peopleCol = `<section class="project-relations"><header><span>\u76F8\u5173\u4EBA\u5458</span></header><div class="project-people">${HOST.projectPeople ? HOST.projectPeople(p, d, B3) : p.peopleIds.map((id) => {
       const who2 = d.people.find((x2) => x2.id === id);
       return B3("project-person", id, `${a2.initial(who2)}<span>${esc2(who2.name)}</span>`, who2.name, `aria-pressed="${d.ui.projectPerson === id}"`);
@@ -20616,6 +20633,17 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       e.preventDefault(); e.stopImmediatePropagation();
       openProjectMilestone(this, p, button.dataset.project);
     }, { capture: true });
+    const editMilestone = e => {
+      const button = e.target.closest?.("[data-edit-milestone],.pd-station[data-id]");
+      if (!button) return;
+      const raw = button.dataset.editMilestone || button.dataset.id || "", [pid, sid] = raw.split("|"), n = /^s(\d+)$/.exec(sid || "");
+      if (!pid || !n) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      openProjectMilestone(this, p, pid, Number(n[1]));
+    };
+    this.registerDomEvent(this.root, "click", e => { if (e.target.closest?.("[data-edit-milestone]")) editMilestone(e); }, { capture: true });
+    this.registerDomEvent(this.root, "keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-edit-milestone]")) editMilestone(e); }, { capture: true });
+    this.registerDomEvent(this.root, "contextmenu", editMilestone, { capture: true });
     this.registerDomEvent(this.root,"click",e=>{
       const button=e.target.closest?.("[data-edit-project-due]");if(!button)return;
       e.preventDefault();e.stopImmediatePropagation();const input=button.parentElement.querySelector("input");button.hidden=true;input.hidden=false;input.focus();try{input.showPicker?.();}catch(_){}
