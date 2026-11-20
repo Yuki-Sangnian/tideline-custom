@@ -2743,9 +2743,17 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .capture-types .capture-type-name{font-size:11px;line-height:1.2;color:var(--secondary);white-space:nowrap}
 .compass-root .capture-types [aria-pressed="true"] .capture-type-name{color:var(--ink)}
 .compass-root .capture-types [aria-pressed="true"]::after{bottom:-3px;left:50%;width:18px;transform:translateX(-50%)}
-/* 0.3（使用者 2026-11-08）：不显示系统滚动条，改用手绘小三角（ui/more.js）；点三角滚动 */
-.compass-root, .compass-root *{scrollbar-width:none!important}
-.compass-root ::-webkit-scrollbar{width:0!important;height:0!important}
+/* Draggable, visible scrollbars on every scrollable Tideline page and pane. */
+.compass-root{--tideline-scroll-thumb:rgba(105,127,138,.14);--tideline-scroll-hover:rgba(105,127,138,.75);--tideline-scroll-active:#536c78;--tideline-scroll-track:transparent}
+.compass-root[data-theme="night"]{--tideline-scroll-thumb:rgba(154,175,185,.14);--tideline-scroll-hover:rgba(154,175,185,.75);--tideline-scroll-active:#b2c2ca;--tideline-scroll-track:transparent}
+/* Keep Chromium's styled scrollbars rather than the platform's disappearing overlay. */
+.compass-root, .compass-root *{scrollbar-width:auto!important;scrollbar-color:auto!important}
+.compass-root::-webkit-scrollbar,.compass-root *::-webkit-scrollbar{width:12px!important;height:12px!important;display:block!important;background:transparent!important}
+.compass-root::-webkit-scrollbar-track,.compass-root *::-webkit-scrollbar-track{background:var(--tideline-scroll-track)!important;border-radius:8px}
+.compass-root::-webkit-scrollbar-thumb,.compass-root *::-webkit-scrollbar-thumb{background:var(--tideline-scroll-thumb)!important;border:3px solid transparent!important;background-clip:padding-box!important;border-radius:8px;min-height:28px}
+.compass-root::-webkit-scrollbar-thumb:hover,.compass-root *::-webkit-scrollbar-thumb:hover{background-color:var(--tideline-scroll-hover)!important}
+.compass-root::-webkit-scrollbar-thumb:active,.compass-root *::-webkit-scrollbar-thumb:active{background-color:var(--tideline-scroll-active)!important}
+.compass-root::-webkit-scrollbar-corner,.compass-root *::-webkit-scrollbar-corner{background:transparent!important}
 .compass-root #r33-more{z-index:46}
 .compass-root #r33-more i{pointer-events:auto;cursor:pointer;color:var(--secondary)}
 .compass-root #r33-more i:hover{color:var(--ink)}
@@ -4160,3 +4168,56 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #library .lib-note-branch li:last-child,.compass-root #library .lib-note-tree li:last-child{margin-bottom:0}
 .compass-root #library .lib-note-branch li:before,.compass-root #library .lib-note-tree li:before{top:calc(var(--lh,19.5px) / 2)}
 .compass-root #library .lib-note-leaf{font-size:13px;line-height:1.5}
+
+/* Separate calendar capture and upcoming schedule list. */
+.compass-root #capture-schedule:not([hidden]){display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin:10px 0}
+.compass-root #capture-schedule label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--secondary)}
+.compass-root #capture-schedule input{width:100%;min-width:0}
+.compass-root #capture-schedule small{grid-column:1/-1;font-size:11px;line-height:1.5;color:var(--secondary)}
+.compass-root .schedule-list-heading{display:flex;align-items:center;justify-content:space-between;margin:0 0 15px;font-size:18px}
+.compass-root .schedule-list-row{display:flex;align-items:center;gap:16px;width:100%;padding:14px 4px;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;background:none;text-align:left}
+.compass-root .schedule-list-row time{flex:none;font:12px/1.7 var(--mono);color:var(--secondary)}
+.compass-root .schedule-list-row>span{font-size:15px;overflow-wrap:anywhere}
+.compass-root .schedule-explanation{padding:10px 16px;font-size:14px;line-height:1.8}
+.compass-root .overdue-original-date{display:block;color:var(--now);font:10px/1.5 var(--sans)}
+
+/* Separate title and body when capturing an idea. */
+.compass-root #capture #capture-idea-content:not([hidden]){margin-top:10px;min-height:90px;font-size:13px;line-height:1.7}
+.compass-root #capture #capture-idea-content[hidden]{display:none!important}
+
+/* The thought composer has a separate title and content field. */
+.compass-root #idea-form #idea-content-input{display:block;width:100%;box-sizing:border-box;min-height:88px;max-height:240px;margin:8px 0;padding:8px 0;resize:vertical;overflow-y:auto;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;color:var(--ink);font:14px/1.8 var(--sans)}
+.compass-root #idea-form #idea-content-input::placeholder{color:var(--secondary);opacity:.65}
+
+/* Week planning completion controls share the task completion action. */
+.compass-root #thought .plan-task button.pt-mark{appearance:none;display:block;box-sizing:border-box;padding:0;min-width:0;min-height:0;background:transparent;box-shadow:none;cursor:pointer;position:relative;overflow:visible}
+.compass-root #thought .plan-task button.pt-mark::before{content:"";position:absolute;inset:-6px;border-radius:50%}
+.compass-root #thought .plan-task button.pt-mark:hover{border-color:var(--ink);background:rgba(104,123,131,.12)}
+.compass-root #thought .plan-task button.pt-mark:focus-visible{outline:2px solid var(--ink);outline-offset:4px}
+.compass-root #thought .plan-task.done{opacity:.5}
+
+.compass-root #review .review-day-edit{margin-left:auto;padding:2px 5px;font-size:11px;color:var(--secondary);background:transparent;border:0;box-shadow:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.compass-root #review .review-score-edit{padding:0;background:transparent;border:0;box-shadow:none;color:var(--secondary);text-align:right;cursor:pointer;font:inherit}
+.compass-root #review button.review-habit-edit{padding:0;background:transparent;border:0;box-shadow:none;color:inherit;font:inherit;cursor:pointer}
+.compass-root #review .review-day-edit:hover,.compass-root #review .review-score-edit:hover{color:var(--ink)}
+.compass-root #review .review-day-edit:focus-visible,.compass-root #review .review-score-edit:focus-visible,.compass-root #review .review-habit-edit:focus-visible{outline:1px solid var(--secondary);outline-offset:3px}
+
+/* Keep content's breathing room inside the scroller so its thumb reaches the paper edge. */
+.compass-root #sheet{margin-right:0;padding-right:64px;box-sizing:border-box}
+@container compass (max-width:1320px){.compass-root #sheet{padding-right:48px}}
+@container compass (max-width:999px){.compass-root #sheet{padding-right:32px}}
+.compass-root #sheet::-webkit-scrollbar-thumb{border-right:0!important}
+
+/* Center the navigation within the left gutter and spread all entries over its height. */
+.compass-root .rail{left:0;top:24px;bottom:24px;width:128px;justify-content:space-between;gap:8px}
+.compass-root .rail #modules{display:contents}
+.compass-root .rail .module{width:80px;flex:0 0 auto;height:clamp(48px,7cqh,68px);min-height:0;gap:6px;font-size:13px}
+.compass-root .rail .module .nav-icon{width:26px;height:26px;flex:none}
+.compass-root .rail .module.settings{margin-top:0}
+@container compass (max-width:1320px){.compass-root .rail{width:112px}}
+@container compass (max-width:999px){.compass-root .rail{width:96px}}
+@container compass (max-height:640px){
+  .compass-root .rail{top:16px;bottom:16px;gap:4px}
+  .compass-root .rail .module{height:clamp(38px,7cqh,48px);font-size:12px;gap:4px}
+  .compass-root .rail .module .nav-icon{width:23px;height:23px}
+}

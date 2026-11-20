@@ -2372,8 +2372,73 @@ function isoWeek(date2) {
 var THOUGHT_HTML = `<section id="thought" class="page thought" aria-label="\u601D\u7D22" hidden>
 <div class="sky-interactions" id="sky-interactions"><button class="sky-empty" id="sky-empty" aria-label="\u5728\u5929\u7A7A\u8BB0\u4E0B\u60F3\u6CD5" hidden></button><div id="weeks"></div><div id="stars"></div><button id="lighthouse-toggle" class="lighthouse-hit" aria-label="\u7184\u706D\u706F\u5854\uFF0C\u67E5\u770B\u60F3\u6CD5" aria-pressed="true"></button></div>
 <div id="planning" class="planning"><div class="goals" id="goals"></div><button class="fold week-fold" data-action="week-note" aria-label="\u5C55\u5F00\u672C\u5468\u5468\u8BB0"></button><div id="week-board" class="week-board"></div></div>
-<div id="ideas" class="ideas" hidden><div class="ideas-layout"><aside class="ideas-index"><div id="idea-heatmap" class="idea-heatmap"></div><div id="idea-filters" class="idea-filters"></div></aside><div class="ideas-stream"><form id="idea-form" class="idea-composer"><textarea id="idea-input" aria-label="\u8BB0\u4E0B\u4E00\u6761\u60F3\u6CD5" placeholder="\u73B0\u5728\u7684\u60F3\u6CD5\u662F\u2026" rows="1"></textarea><div class="composer-bottom"><div class="composer-tag-tools" data-expanded="false"><button class="composer-tag-toggle" id="idea-tag-toggle" type="button" aria-label="\u9009\u62E9\u60F3\u6CD5\u6807\u7B7E" aria-controls="idea-tag-drawer" aria-expanded="false"><span id="composer-mark" aria-hidden="true"></span></button><div class="composer-tag-runway"><div id="idea-tag-drawer" class="tag-inline-drawer" role="group" aria-label="\u60F3\u6CD5\u6807\u7B7E\u9009\u62E9" aria-hidden="true" inert><div id="tag-inline-options" class="tag-inline-options"></div></div><div id="chosen-tag-wrap" class="chosen-tag-wrap"><div id="composer-tags" class="composer-tags"></div></div></div></div><button class="text-button" type="submit">\u8BB0\u4E0B</button></div></form><div id="idea-list" class="idea-feed"></div></div></div></div>
+<div id="ideas" class="ideas" hidden><div class="ideas-layout"><aside class="ideas-index"><div id="idea-heatmap" class="idea-heatmap"></div><div id="idea-filters" class="idea-filters"></div></aside><div class="ideas-stream"><form id="idea-form" class="idea-composer"><textarea id="idea-input" aria-label="\u8BB0\u4E0B\u4E00\u6761\u60F3\u6CD5" placeholder="\u73B0\u5728\u7684\u60F3\u6CD5\u662F\u2026" rows="1"></textarea><textarea id="idea-content-input" aria-label="想法内容" placeholder="写下想法的具体内容…" rows="3"></textarea><div class="composer-bottom"><div class="composer-tag-tools" data-expanded="false"><button class="composer-tag-toggle" id="idea-tag-toggle" type="button" aria-label="\u9009\u62E9\u60F3\u6CD5\u6807\u7B7E" aria-controls="idea-tag-drawer" aria-expanded="false"><span id="composer-mark" aria-hidden="true"></span></button><div class="composer-tag-runway"><div id="idea-tag-drawer" class="tag-inline-drawer" role="group" aria-label="\u60F3\u6CD5\u6807\u7B7E\u9009\u62E9" aria-hidden="true" inert><div id="tag-inline-options" class="tag-inline-options"></div></div><div id="chosen-tag-wrap" class="chosen-tag-wrap"><div id="composer-tags" class="composer-tags"></div></div></div></div><button class="text-button" type="submit">\u8BB0\u4E0B</button></div></form><div id="idea-list" class="idea-feed"></div></div></div></div>
 </section>`;
+function tidelineSheetWidth(sheet) {
+  if (!sheet) return 0;
+  const style = getComputedStyle(sheet);
+  return Math.max(0, sheet.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0));
+}
+function weekPlanningTasks(tasks, date, today) {
+  const effectiveDate = task => task.status === "done" ? task.completed || task.date : task.date && task.date < today && !done(task) ? today : task.date;
+  return tasks.filter(task => date ? effectiveDate(task) === date : !effectiveDate(task)).sort((a, b) =>
+    Number(a.status === "done") - Number(b.status === "done") ||
+    Number(!!b.date && b.date < today && !done(b)) - Number(!!a.date && a.date < today && !done(a)) ||
+    (a.date || "9999").localeCompare(b.date || "9999") || compareDailyTasks(a, b));
+}
+function buildIdeaSkyGraph(ideas, width) {
+  const hidden = new Set(["adopted", "parked", "paused", "shelved", "archived", "已采用", "暂停", "已暂停", "搁置", "已搁置"]);
+  const nodes = ideas.filter(i => !hidden.has(String(i.stage || "").trim().toLowerCase())).map(idea => {
+    const raw = Array.isArray(idea.tags) ? idea.tags : idea.tag ? [idea.tag] : [];
+    const tags = [...new Set(raw.map(t => String(t || "").normalize("NFKC").trim().replace(/^#+/, "").trim()).filter(Boolean))].sort();
+    return { idea, tags };
+  }).sort((a, b) => (a.tags[0] || "\uffff").localeCompare(b.tags[0] || "\uffff") || String(a.idea.id).localeCompare(String(b.idea.id)));
+  const usable = Math.max(40, width * .73), height = 149;
+  const spacing = Math.min(58, Math.sqrt(usable * height / Math.max(1, nodes.length)) * .48);
+  // Stable, irregular scatter: only prevent crowding; never snap stars to rows or columns.
+  nodes.forEach((node, n) => {
+    let seed = [...String(node.idea.id)].reduce((v, c) => Math.imul(v ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+    const rand = () => {
+      seed = (seed + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(seed ^ seed >>> 15, seed | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+    let chosen, bestDistance = -1;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const point = [width * .055 + rand() * usable, 40 + rand() * height];
+      const distance = n ? Math.min(...nodes.slice(0, n).map(other => Math.hypot(point[0] - other.point[0], point[1] - other.point[1]))) : Infinity;
+      if (distance > bestDistance) { chosen = point; bestDistance = distance; }
+      if (distance >= spacing) break;
+    }
+    node.point = chosen;
+    node.hitSize = Math.max(12, Math.min(42, spacing * .85));
+  });
+  const groups = new Map(), edges = [];
+  nodes.forEach(node => node.tags.forEach(tag => {
+    if (!groups.has(tag)) groups.set(tag, []);
+    groups.get(tag).push(node);
+  }));
+  // A spanning tree keeps every member connected, without a distance cutoff or a dense mesh.
+  groups.forEach((group, tag) => {
+    if (group.length < 2) return;
+    const used = new Set([0]), best = group.map(() => Infinity), parent = group.map(() => 0);
+    let current = 0;
+    while (used.size < group.length) {
+      group.forEach((node, n) => {
+        if (used.has(n)) return;
+        const distance = Math.hypot(node.point[0] - group[current].point[0], node.point[1] - group[current].point[1]);
+        if (distance < best[n]) { best[n] = distance; parent[n] = current; }
+      });
+      let next = -1;
+      group.forEach((_, n) => { if (!used.has(n) && (next < 0 || best[n] < best[next])) next = n; });
+      edges.push({ from: group[parent[next]], to: group[next], tag });
+      used.add(next);
+      current = next;
+    }
+  });
+  return { nodes, edges };
+}
 function createThought({ core, r12Art, r14Marine, view }) {
   const d = core.data, $5 = (s) => HOST.querySelector(s), $$3 = (s) => [...HOST.querySelectorAll(s)];
   const asset = core.asset, announce = core.announce;
@@ -2409,12 +2474,12 @@ function createThought({ core, r12Art, r14Marine, view }) {
     renderGoalProgress();
     const revDay = (date2) => d.review?.days?.find((r) => r.date === date2), proj = (id) => d.projects?.find((p) => p.id === id);
     $5("#week-board").innerHTML = [[null, null], ...weekDates()].map(([date2, num2]) => {
-      const tasks = d.tasks.filter((t) => date2 ? t.date === date2 : !t.date).sort(compareDailyTasks), done2 = tasks.filter((t) => t.status === "done").length, isToday = date2 === d.clock.date, future = date2 && date2 > d.clock.date, rv = date2 && revDay(date2), wd = date2 ? WD[(/* @__PURE__ */ new Date(date2 + "T12:00:00Z")).getUTCDay()] : "";
+      const tasks = weekPlanningTasks(d.tasks, date2, d.clock.date), done2 = tasks.filter((t) => t.status === "done").length, isToday = date2 === d.clock.date, future = date2 && date2 > d.clock.date, rv = date2 && revDay(date2), wd = date2 ? WD[(/* @__PURE__ */ new Date(date2 + "T12:00:00Z")).getUTCDay()] : "";
       const hrs = isToday ? d.investments.reduce((n, x2) => n + x2.hours, 0) : rv ? rv.investments.reduce((n, x2) => n + x2.hours, 0) : 0, habits = isToday ? d.habits.map((h) => h.value) : rv ? rv.habits : null;
       const head = date2 ? `<div class="day-number ${isToday ? "now" : ""}">${num2}<small>${wd}${isToday ? " \xB7 \u4ECA\u5929" : ""}</small></div>` : `<div class="unscheduled-icon" aria-hidden="true">${icon("box")}<small>\u672A\u6392\u671F</small></div>`;
       const sum = `<p class="day-sum">${tasks.length ? `<span>${date2 ? future ? "\u8BA1\u5212" : "\u5B8C\u6210 " + done2 + " /" : "\u5F85\u6392"} <b class="mono">${date2 && !future ? tasks.length : tasks.length}</b> \u4EF6</span>` : ""}${hrs ? `<span class="mono">${formatEffortHours(hrs)}h</span>` : ""}</p>`;
       const events = (d.planningEvents.get(date2) || []).map((e) => `<div class="day-event" role="listitem"><span class="mono">${esc(e.time || "\u5168\u5929")}</span>${esc(e.title)}</div>`).join("");
-      const items = tasks.map((t) => `<div class="plan-task ${t.status === "done" ? "done" : ""}" role="listitem" tabindex="0" draggable="true" data-plan="${esc(t.id)}" aria-label="${esc(t.title)}\uFF0C${date2 || "\u672A\u6392\u671F"}\uFF0C\u53EF\u62D6\u52A8"><i class="pt-mark" aria-hidden="true">${t.status === "done" ? "\u2713" : ""}</i><span class="pt-title">${esc(t.title)}</span>${t.projectId && proj(t.projectId) ? `<small class="pt-project">${esc(proj(t.projectId).title)}</small>` : ""}</div>`).join("");
+      const items = tasks.map((t) => `<div class="plan-task ${t.status === "done" ? "done" : ""}" role="listitem" tabindex="0" draggable="true" data-plan="${esc(t.id)}" aria-label="${esc(t.title)}\uFF0C${date2 || "\u672A\u6392\u671F"}\uFF0C\u53EF\u62D6\u52A8"><button type="button" class="pt-mark" data-complete="${esc(t.id)}" draggable="false" aria-pressed="${t.status === "done"}" aria-label="${t.status === "done" ? "重新打开" : "完成"}：${esc(t.title)}" title="${t.status === "done" ? "重新打开任务" : "标记为已完成"}">${t.status === "done" ? "\u2713" : ""}</button><span class="pt-title">${esc(t.title)}${t.date&&t.date<d.clock.date&&!done(t)?`<small class="overdue-original-date">原截止 ${esc(t.date)}</small>`:""}</span>${t.projectId && proj(t.projectId) ? `<small class="pt-project">${esc(proj(t.projectId).title)}</small>` : ""}</div>`).join("");
       const foot = habits ? `<div class="day-foot" aria-label="\u4E60\u60EF">${habits.map((v2) => `<i class="${v2 === null ? "is-null" : v2 ? "is-on" : "is-off"}"></i>`).join("")}</div>` : "";
       return `<div class="day-column ${isToday ? "is-today" : ""} ${future ? "is-future" : ""}" role="list" data-drop="${date2 || ""}" aria-label="${date2 || "\u672A\u6392\u671F"}">${head}${sum}${events}${items}${foot}<div class="day-add-divider"></div><button type="button" class="day-empty-new" data-day-new="${date2 || ""}" aria-label="\u5728${date2 ? num2 + "\u65E5" : "\u672A\u6392\u671F"}\u8BB0\u4E00\u4EF6\u4EFB\u52A1" title="\u5728\u8FD9\u5929\u8BB0\u4E00\u4EF6\u4EFB\u52A1"><span aria-hidden="true">+</span></button></div>`;
     }).join("");
@@ -2444,7 +2509,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
     if (ideaReadingComponent) { view.removeChild(ideaReadingComponent); ideaReadingComponent = null; }
     renderHeatmap();
     renderComposerTags();
-    $5("#idea-form").dataset.empty = String(!(d.cache.ideaDraft || ""));
+    $5("#idea-form").dataset.empty = String(!(d.cache.ideaDraft || d.cache.ideaContentDraft || ""));
     const visible2 = d.ideas.filter((i) => (!d.ui.ideaDate || i.created.slice(0, 10) === d.ui.ideaDate) && (!d.ui.ideaTag || tagsOf(i).includes(d.ui.ideaTag)) && (!d.ui.ideaStageFilter || (i.stage || "seed") === d.ui.ideaStageFilter)).sort((a2, b3) => Number(["adopted", "parked"].includes(a2.stage)) - Number(["adopted", "parked"].includes(b3.stage)) || b3.created.slice(0, 10).localeCompare(a2.created.slice(0, 10)) || (Number(b3.createdAt) || 0) - (Number(a2.createdAt) || 0) || b3.created.localeCompare(a2.created));
     if (!visible2.some((i) => i.id === d.ui.idea)) { d.ui.idea = null; d.ui.ideaExpanded = false; }
     const feed = $5("#idea-list"), scroll = feed.scrollTop;
@@ -2504,38 +2569,38 @@ function createThought({ core, r12Art, r14Marine, view }) {
   }
   function renderSkyControls() {
     sky();
-    const w2 = $5("#sheet").clientWidth;
+    const w2 = tidelineSheetWidth($5("#sheet"));
     $5("#weeks").hidden = !d.ui.lamp;
     $5("#stars").hidden = d.ui.lamp;
     $5("#weeks").innerHTML = weekNodes().map(({ week }, i) => {
       const x2 = 90 + i * (w2 - 370) / 12, y2 = 145 - Math.sin(i / 12 * Math.PI) * 49;
       return `<button class="week-node" data-week="${week}" style="left:${x2}px;top:${y2}px;--sky-node-ink:${r12Art.skyInk(x2, y2, w2)}" ${d.ui.week === week ? 'aria-current="true"' : ""} aria-label="\u7B2C ${week} \u5468">${week}</button>`;
     }).join("");
-    $5("#stars").innerHTML = d.ideas.map((i, n) => {
-      const [x2, y2] = starPosition(n, w2), color = r12Art.skyInk(x2, y2, w2), size = { seed: 1.8, growing: 2.8, ready: 3.8, adopted: 3.8, parked: 1.8 }[i.stage] || 1.8;
-      return `<button class="star-button" data-star="${esc(i.id)}" data-star-title="${esc(i.title)}" style="left:${x2}px;top:${y2}px" aria-label="${i.review ? "\u56DE\u987E" : "\u5C55\u5F00"}\uFF1A${esc(i.title)}"><svg viewBox="0 0 32 32" aria-hidden="true"><g opacity="${i.stage === "seed" ? 0.55 : 1}">${skyGlint(16, 16, size, color)}${i.review ? circle(16, 16, 7, 0.65, color) : ""}</g></svg></button>`;
+    $5("#stars").innerHTML = ideaSkyGraph(w2).nodes.map(({ idea: i, point: [x2, y2], hitSize }) => {
+      const color = r12Art.skyInk(x2, y2, w2), size = { seed: 1.8, growing: 2.8, ready: 3.8 }[i.stage] || 1.8;
+      return `<button class="star-button" data-star="${esc(i.id)}" data-star-title="${esc(i.title)}" style="left:${x2}px;top:${y2}px;width:${hitSize}px;height:${hitSize}px" aria-label="${i.review ? "\u56DE\u987E" : "\u5C55\u5F00"}\uFF1A${esc(i.title)}"><svg viewBox="0 0 32 32" aria-hidden="true"><g opacity="${({ seed: .45, growing: .72, ready: 1 })[i.stage] || .45}">${skyGlint(16, 16, size, color)}${i.review ? circle(16, 16, 7, 0.65, color) : ""}</g></svg></button>`;
     }).join("");
   }
   function ideaStar(i) {
     const size = { seed: 5, growing: 6.5, ready: 8, adopted: 8, parked: 5 }[i.stage] || 5, opacity = { seed: 0.5, growing: 0.75, ready: 1, adopted: 1, parked: 0.35 }[i.stage] || 0.5;
     return `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><g opacity="${opacity}">${star(12, 12, size)}${i.review ? circle(12, 12, 10, 1) : ""}</g></svg>`;
   }
-  function starPosition(n, w2) {
-    const halton = (v2, base2) => {
-      let result = 0, f = 1;
-      while (v2) {
-        f /= base2;
-        result += f * (v2 % base2);
-        v2 = Math.floor(v2 / base2);
-      }
-      return result;
-    };
-    return [(0.055 + halton(n + 1, 2) * 0.73) * w2, 40 + halton(n + 1, 3) * 149];
+  function ideaSkyGraph(width) {
+    const key = JSON.stringify([width, d.ideas.map(i => [i.id, i.title, i.stage, i.tags, i.tag, i.review])]);
+    if (d.cache.ideaSkyGraphKey !== key) {
+      d.cache.ideaSkyGraphKey = key;
+      d.cache.ideaSkyGraph = buildIdeaSkyGraph(d.ideas, width);
+    }
+    return d.cache.ideaSkyGraph;
   }
   const skyGlint = (x2, y2, r, color) => ink([[x2 - r, y2], [x2, y2 - 0.45], [x2 + r, y2]], 0.6, color) + ink([[x2, y2 - r * 1.45], [x2 - 0.2, y2], [x2, y2 + r * 1.45]], 0.65, color);
-  function skyLink(p, q2) {
-    const key = "r15-dash-" + p.map(Math.round).join("-") + "-" + q2.map(Math.round).join("-"), x2 = (p[0] + q2[0]) / 2, y2 = (p[1] + q2[1]) / 2, w2 = $5("#sheet").clientWidth, color = r12Art.skyInk(x2, y2, w2);
-    return `<defs><mask id="${key}" maskUnits="userSpaceOnUse" x="0" y="0" width="${w2}" height="240"><path d="M${p.join(",")}L${q2.join(",")}" fill="none" stroke="white" stroke-width="3" stroke-dasharray="2.5 6.5"/></mask></defs><g data-star-link mask="url(#${key})">${ink([p, q2], 0.62, color, 'opacity=".62"')}</g>`;
+  function skyLink(edge) {
+    const p = edge.from.point, q2 = edge.to.point, w2 = tidelineSheetWidth($5("#sheet"));
+    const x2 = (p[0] + q2[0]) / 2, y2 = (p[1] + q2[1]) / 2;
+    const hash = [...(edge.tag + edge.from.idea.id + edge.to.idea.id)].reduce((v, c) => (v * 31 + c.charCodeAt(0)) >>> 0, 0);
+    const bend = (hash % 2 ? 1 : -1) * (10 + hash % 15), length = Math.hypot(q2[0] - p[0], q2[1] - p[1]) || 1;
+    const cx2 = x2 - (q2[1] - p[1]) / length * bend, cy2 = y2 + (q2[0] - p[0]) / length * bend;
+    return `<path data-star-link data-star-tag="${esc(edge.tag)}" d="M${p.join(",")}Q${cx2},${cy2} ${q2.join(",")}" fill="none" stroke="${r12Art.skyInk(x2, y2, w2)}" stroke-width=".7" stroke-opacity=".42" stroke-dasharray="2.5 6.5"><title>${esc(edge.tag)}</title></path>`;
   }
   function lampGlow(cx, cy, on, night) {
     const rand = randomFor("lamp-halo"), color = on ? night ? "#D8B77D" : "#BE965F" : "#8D9291";
@@ -2692,7 +2757,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
   const skies = /* @__PURE__ */ new Map(), lighthouses = /* @__PURE__ */ new Map();
   let applied = "", appliedPhase = "day";
   function sky() {
-    const k2 = d.clock.time + "|" + d.ui.lamp, el = HOST.querySelector("#sky"), w2 = HOST.querySelector("#sheet")?.clientWidth, a2 = k2 + "|" + w2;
+    const k2 = d.clock.time + "|" + d.ui.lamp, el = HOST.querySelector("#sky"), w2 = tidelineSheetWidth(HOST.querySelector("#sheet")), a2 = k2 + "|" + w2;
     if (a2 === applied && el?.firstElementChild === d.cache.r12Sky?.canvas) return appliedPhase;
     const phase = skyRaw();
     applied = a2;
@@ -2750,15 +2815,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
     Object.assign($5("#lighthouse-toggle").style, { left: cx - 24 + "px", top: cy - 24 + "px", right: "auto", width: "48px", height: "48px" });
     if (d.ui.lamp) s += ink(Array.from({ length: 13 }, (_2, i) => [90 + i * (w2 - 370) / 12, 164 - Math.sin(i / 12 * Math.PI) * 49]), 1, night ? "#C0C8CB" : TICK);
     else {
-      const groups = {};
-      d.ideas.forEach((idea, n) => (groups[idea.tag] ??= []).push({ n, point: starPosition(n, w2) }));
-      let links2 = "";
-      Object.values(groups).forEach((group) => group.slice(0, 8).forEach((entry, i) => {
-        if (!i) return;
-        const near = group.slice(0, i).sort((a2, b3) => Math.hypot(...a2.point.map((v2, n) => v2 - entry.point[n])) - Math.hypot(...b3.point.map((v2, n) => v2 - entry.point[n])))[0];
-        if (near && Math.hypot(...near.point.map((v2, n) => v2 - entry.point[n])) < w2 * 0.19) links2 += skyLink(near.point, entry.point);
-      }));
-      s += "<g data-star-links>" + links2 + "</g>";
+      s += '<g data-star-links>' + ideaSkyGraph(w2).edges.map(skyLink).join("") + '</g>';
     }
     return s;
   }
@@ -3028,10 +3085,14 @@ function createThought({ core, r12Art, r14Marine, view }) {
       }
       d.ui.draftTags = [];
       closeTagPanels();
-      captureIdea(body, tags);
+      const content=$5("#idea-content-input").value.trim();
+      captureIdea([body,content].filter(Boolean).join("\n"), tags);
       $5("#idea-input").value = "";
       $5("#idea-input").focus();
       d.cache.ideaDraft = "";
+      d.cache.ideaContentDraft="";
+      $5("#idea-content-input").value="";
+      $5("#idea-content-input").style.height="";
       $5("#idea-form").dataset.empty = "true";
       $5("#idea-input").style.height = "32px";
     }
@@ -3050,9 +3111,14 @@ function createThought({ core, r12Art, r14Marine, view }) {
         fitTagSidebar();
       }
     }
+    if(e.target.id==="idea-content-input"){
+      d.cache.ideaContentDraft=e.target.value;
+      $5("#idea-form").dataset.empty=String(!(e.target.value||$5("#idea-input").value));
+      e.target.style.height="auto";e.target.style.height=Math.min(240,Math.max(88,e.target.scrollHeight))+"px";
+    }
     if (e.target.id === "idea-input") {
       d.cache.ideaDraft = e.target.value;
-      $5("#idea-form").dataset.empty = String(!e.target.value);
+      $5("#idea-form").dataset.empty = String(!(e.target.value||d.cache.ideaContentDraft));
       fitIdeaEntry();
     }
   });
@@ -3094,7 +3160,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
         return;
       }
     }
-    if (e.target.id === "idea-input" && e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    if (["idea-input","idea-content-input"].includes(e.target.id) && e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode!==229) {
       e.preventDefault();
       $5("#idea-form").requestSubmit();
       return;
@@ -3122,6 +3188,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
   HOST.addEventListener("dragstart", (e) => {
     const button = e.target.closest?.("#thought [data-plan]");
     if (!button) return;
+    if (e.target.closest(".pt-mark")) { e.preventDefault(); return; }
     d.ui.drag = button.dataset.plan;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", d.ui.drag);
@@ -5089,7 +5156,7 @@ var Index = class {
       return;
     }
     if (kind === "calendar") {
-      this.noteEvents = (fm.events || []).map((e, i) => ({ id: "e" + i, date: date(e.date), time: String(e.time || ""), title: String(e.title || ""), description: e.description || "" }));
+      this.noteEvents = (fm.events || []).map((e, i) => ({ id: "e" + i, date: date(e.date), time: String(e.time || ""), endTime:String(e.endTime||""), title: String(e.title || ""), description: e.description || "" }));
       return;
     }
     const title = base(path);
@@ -5249,6 +5316,7 @@ var Index = class {
       this.days.set(d, {
         path,
         date: d,
+        schedules: Array.isArray(fm.schedules)?fm.schedules.filter(e=>e&&e.id&&e.start&&e.end).map(e=>({...e,title:String(e.title||"日程")})):[],
         habits: fm.habits || {},
         scores: fm.scores || {},
         effort: fm.effort || {},
@@ -5737,9 +5805,9 @@ function dayText(date2, today = "") {
 }
 
 // src/ui/capture.js
-var TYPES = [["project", "route", "项目"], ["book", "book", "书籍"], ["literature", "note", "文献"], ["idea", "star", "想法"], ["task", "box", "任务"], ["note", "note", "随手记"], ["achievement", "flag", "成就"], ["gratitude", "heart", "感恩"]];
+var TYPES = [["project", "route", "项目"], ["book", "book", "书籍"], ["literature", "note", "文献"], ["idea", "star", "想法"], ["task", "box", "任务"], ["schedule", "calendar", "日程"], ["note", "note", "随手记"], ["achievement", "flag", "成就"], ["gratitude", "heart", "感恩"]];
 var TOKENS = /周[一二三四五六日天]|#[^\s#@]+|@[^\s#@]+/g;
-var CAPTURE_HTML = `<div id="capture" class="capture paper-strip" hidden><div id="capture-types" class="capture-types"></div><form id="capture-form"><textarea id="capture-input" aria-label="记一笔" rows="1" placeholder="Enter 保存，Shift+Enter 换行"></textarea><div id="capture-tokens"></div><textarea id="capture-description" aria-label="日程说明（可选）" rows="1" placeholder="日程说明（可选）"></textarea></form><button class="icon-button" data-action="capture-save" aria-label="\u8BB0\u4E0B">\u21B5</button></div>`;
+var CAPTURE_HTML = `<div id="capture" class="capture paper-strip" hidden><div id="capture-types" class="capture-types"></div><form id="capture-form"><textarea id="capture-input" aria-label="记一笔" rows="1" placeholder="Enter 保存，Shift+Enter 换行"></textarea><div id="capture-tokens"></div><div id="capture-schedule" hidden><label>日期<input type="date" id="capture-schedule-date"></label><label>开始<input type="time" id="capture-schedule-start"></label><label>结束<input type="time" id="capture-schedule-end"></label><small>结束早于开始时，按次日结束计算。日程与任务分开记录。</small></div><textarea id="capture-description" aria-label="日程说明（可选）" rows="1" placeholder="日程说明（可选）"></textarea><textarea id="capture-idea-content" hidden rows="4" aria-label="想法内容" placeholder="写下想法的具体内容…（回车保存，Shift＋回车换行）"></textarea></form><button class="icon-button" data-action="capture-save" aria-label="\u8BB0\u4E0B">\u21B5</button></div>`;
 var clean = (s) => String(s).replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "\u672A\u547D\u540D";
 function openProjectMilestone(view, plugin, path) {
   const project = plugin.index.projects.get(path);
@@ -5775,30 +5843,126 @@ function openProjectMilestone(view, plugin, path) {
   };
   modal.open();
 }
+function investmentChoices(index,date,query="") {
+  const q=String(query).normalize("NFKC").trim().toLocaleLowerCase(),all=[];
+  const push=(kind,item)=>{
+    const closed=["done","completed","cancelled","archived"].includes(item.status),active=!item.status||["active","in_progress"].includes(item.status);
+    const visible=kind==="goal"?active:kind==="project"?active:kind==="task"?!closed&&!!item.date&&item.date<=date:false;
+    const base={goal:"目标",task:"任务",project:"项目",history:"常用"}[kind];
+    all.push({title:item.title,kind,rank:{goal:0,task:1,project:2,history:3}[kind],closed,visible,date:item.date||"",order:item.order??1e9,label:base+(closed?"（已完成／归档）":""),status:item.status||""});
+  };
+  for(const x of index.goals.values())push("goal",x);
+  for(const x of index.tasks.values())push("task",x);
+  for(const x of index.projects.values())push("project",x);
+  const known=new Set(all.map(x=>x.title));
+  if(q)for(const day of index.days.values())for(const title of Object.keys(day.effort||{}))if(!known.has(title)){known.add(title);push("history",{title});}
+  const seen=new Set();
+  return all.filter(x=>q?(x.title+" "+x.label).normalize("NFKC").toLocaleLowerCase().includes(q):x.visible).sort((a,b)=>Number(a.closed)-Number(b.closed)||a.rank-b.rank||(a.kind==="task"?(a.date||"9999").localeCompare(b.date||"9999")||a.order-b.order:0)||a.title.localeCompare(b.title,"zh-Hans-u-co-pinyin",{numeric:true,sensitivity:"base"})).filter(x=>{if(seen.has(x.title))return false;seen.add(x.title);return true;});
+}
+function dailyReviewEditPatch(kind, values, date) {
+  if (kind === "habits") {
+    if (Object.values(values).some(v => v !== true && v !== false && v !== null)) throw new Error("请选择习惯状态");
+    return { habits: values };
+  }
+  if (kind === "scores") {
+    if (Object.values(values).some(v => v !== null && (!Number.isInteger(v) || v < 0 || v > 10))) throw new Error("评分须为 0 到 10 的整数");
+    return { scores: values };
+  }
+  if (kind === "sleep") {
+    const { start, end } = values;
+    if (!start && !end) return { sleepStart: null, sleepEnd: null, sleepStartDate: null, sleepEndDate: null, sleepHours: null };
+    if (!start || !end) throw new Error("请填写入睡和起床时间，或将两项都清空");
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(end)) throw new Error("请填写有效的睡眠时间");
+    const hours = sleepDuration(start.slice(11), end.slice(11), start.slice(0,10), end.slice(0,10));
+    if (hours == null || hours <= 0) throw new Error("起床时间须晚于入睡时间");
+    if (end.slice(0,10) !== date) throw new Error("起床日期须为当前复盘日期：" + date);
+    return { sleepStart: start.slice(11), sleepEnd: end.slice(11), sleepStartDate: start.slice(0,10), sleepEndDate: end.slice(0,10), sleepHours: hours };
+  }
+  throw new Error("这项内容不支持修改");
+}
+function applyDailyReviewEdit(fm, patch) {
+  for (const [field, value] of Object.entries(patch)) {
+    if (field === "habits" || field === "scores") {
+      fm[field] = { ...(fm[field] || {}) };
+      for (const [id, state] of Object.entries(value)) {
+        if (state == null) delete fm[field][id]; else fm[field][id] = state;
+      }
+    } else if (value == null) delete fm[field]; else fm[field] = value;
+  }
+  fm.personalRecord = true;
+  fm.tags = list(fm.tags).filter(tag => tag !== "example");
+}
+function openDailyReviewEditor(view, plugin, date, kind) {
+  if (!["habits", "scores", "sleep"].includes(kind)) return;
+  const modal = new import_obsidian7.Modal(plugin.app);
+  modal.onOpen = () => {
+    const el = modal.contentEl, day = plugin.index.days.get(date) || {}, controls = [];
+    el.createEl("h2", { text: date + " · " + { habits: "习惯", scores: "每日问题评分", sleep: "睡眠时间" }[kind] });
+    const values = () => Object.fromEntries(controls.map(c => [c.id, c.input.value === "" ? null : kind === "habits" ? c.input.value === "true" : Number(c.input.value)]));
+    let start, end;
+    if (kind === "sleep") {
+      const field = (label, value) => {
+        const row = el.createEl("label", { text: label }); row.style.cssText = "display:grid;gap:8px;margin:14px 0";
+        const input = row.createEl("input", { type: "datetime-local", value }); input.setAttribute("aria-label", label); return input;
+      };
+      const startDate = day.sleepStartDate || (day.sleepStart && day.sleepEnd && day.sleepStart > day.sleepEnd ? shiftScheduleDate(date,-1) : date);
+      start = field("入睡时间", day.sleepStart ? startDate + "T" + day.sleepStart : "");
+      end = field("起床时间", day.sleepEnd ? (day.sleepEndDate || date) + "T" + day.sleepEnd : "");
+      const duration = el.createEl("p");
+      const preview = () => { try { const p = dailyReviewEditPatch(kind,{ start:start.value,end:end.value },date); duration.textContent = "睡眠时长：" + (p.sleepHours == null ? "未记录" : p.sleepHours + "h"); } catch(e) { duration.textContent = e.message; } };
+      start.oninput = end.oninput = preview; preview();
+    } else {
+      for (const item of plugin.index.config[kind === "habits" ? "habits" : "questions"]) {
+        const row = el.createEl("label", { text: kind === "habits" ? item.name : item.title }); row.style.cssText = "display:grid;grid-template-columns:1fr 120px;gap:16px;align-items:center;margin:14px 0";
+        const input = row.createEl("select"); input.setAttribute("aria-label", kind === "habits" ? item.name : item.title);
+        input.createEl("option", { value:"", text:"未记录" });
+        if (kind === "habits") { input.createEl("option", {value:"true",text:"已完成"}); input.createEl("option", {value:"false",text:"未完成"}); }
+        else for (let n=0;n<=10;n++) input.createEl("option", {value:String(n),text:n+" / 10"});
+        const current = day[kind]?.[item.id]; input.value = current == null ? "" : String(current);
+        controls.push({id:item.id,input});
+      }
+    }
+    const error = el.createEl("p"); error.setAttribute("role","alert"); error.style.color = "var(--text-error)";
+    const actions = el.createDiv(); actions.style.cssText = "display:flex;justify-content:flex-end;gap:10px;margin-top:16px";
+    actions.createEl("button", {text:"取消"}).onclick = () => modal.close();
+    const save = actions.createEl("button", {text:"保存",cls:"mod-cta"});
+    save.onclick = async () => {
+      try {
+        const patch = dailyReviewEditPatch(kind, kind === "sleep" ? {start:start.value,end:end.value} : values(), date);
+        save.disabled = true;
+        await view.lower?.settle();
+        const path = `${FOLDERS.journal}/${date}.md`;
+        await plugin.writer.frontmatter(path, fm => applyDailyReviewEdit(fm,patch));
+        await plugin.index.load(path); plugin.index.examples?.delete(path); plugin.index.emit();
+        view.todayKey = null; view.render(true); modal.close(); view.frame.feedback("已保存 " + date + " 的记录");
+      } catch(e) { error.textContent = e.message; save.disabled = false; }
+    };
+  };
+  modal.open();
+}
 function openTodayInvestments(view, plugin, selectedDate) {
   const modal = new import_obsidian7.Modal(plugin.app), date = selectedDate || plugin.clock().date;
   modal.onOpen = () => {
     const el = modal.contentEl;
     el.createEl("h2", { text: date + " 投入" });
-    el.createEl("p", { text: "搜索并选择任务、项目或目标，填写这一天的累计用时，可选择小时或分钟。" });
+    el.createEl("p", { text: "默认显示进行中的目标、今日未完成任务和进行中的项目。其他事项可通过搜索查找。" });
     const effortList = el.createDiv(), rows = [], suggestions = el.createEl("datalist");
     suggestions.id = "tideline-effort-projects-" + Date.now();
-    const choices = new Map();
-    for (const g of plugin.index.goals.values()) if (g.status !== "done") choices.set(g.title, "目标");
-    for (const p of plugin.index.projects.values()) if (p.status !== "archived" && !choices.has(p.title)) choices.set(p.title, "项目");
-    for (const task of plugin.index.tasks.values()) choices.set(task.title, "任务" + (task.status === "done" ? "（已完成）" : task.status === "cancelled" ? "（已取消）" : ""));
-    for (const day of plugin.index.days.values()) for (const title of Object.keys(day.effort || {})) if (!choices.has(title)) choices.set(title, "常用");
-    for (const title of choices.keys()) suggestions.createEl("option", { value: title });
     const search = el.createEl("input", { type:"search", placeholder:"查找任务、项目、目标…" });
     search.setAttribute("aria-label","查找投入事项"); search.style.cssText="width:100%;margin:8px 0 4px";
     const pick = el.createEl("select"); pick.setAttribute("aria-label", "选择任务、目标、项目或常用投入"); pick.style.cssText = "width:100%;margin:4px 0 8px";
     const status = el.createEl("small"); status.setAttribute("aria-live","polite"); status.style.cssText="display:block;color:var(--text-muted);margin-bottom:8px";
     function filterChoices() {
-      const query=search.value.trim().toLocaleLowerCase(); pick.replaceChildren();
+      const query=search.value.trim(),choices=investmentChoices(plugin.index,date,query);pick.replaceChildren();suggestions.replaceChildren();
       pick.createEl("option",{text:"选择一项，加入投入记录…",value:""});
-      let count=0;
-      for(const [title,kind] of choices) if((title+" "+kind).toLocaleLowerCase().includes(query)) { pick.createEl("option",{text:kind+" · "+title,value:title}); count++; }
-      status.textContent=count ? `找到 ${count} 项` : "没有匹配项，也可在下方直接填写事项名称";
+      let group=null,last="";
+      for(const item of choices){
+        const label=item.closed?"已完成／归档":{goal:"进行中的目标",task:query?"任务":"今日任务（含逾期）",project:query?"项目":"进行中的项目",history:"其他投入"}[item.kind];
+        if(label!==last){last=label;group=pick.createEl("optgroup",{attr:{label}});}
+        group.createEl("option",{text:item.label+" · "+item.title,value:item.title});
+        suggestions.createEl("option",{value:item.title});
+      }
+      status.textContent=query?(choices.length?`找到 ${choices.length} 项，已完成项排在底部`:"没有匹配项，也可在下方直接填写事项名称"):(choices.length?`当前 ${choices.length} 项 · 目标 → 今日任务 → 项目；搜索可查找其他事项`:"暂无当前事项，输入关键词可查找其他任务、目标或项目");
     }
     search.oninput=filterChoices; filterChoices();
     el.insertBefore(search,effortList); el.insertBefore(pick,effortList); el.insertBefore(status,effortList);
@@ -5856,7 +6020,7 @@ function openTodayInvestments(view, plugin, selectedDate) {
         plugin.index.examples?.delete(path);
         plugin.index.emit();
         view.todayKey = null; view.render(true);
-        modal.close(); view.frame.feedback("已保存今日投入");
+        modal.close(); view.frame.feedback("已保存 " + date + " 的投入");
       } catch (e) { error.textContent = "保存失败：" + e.message; save.disabled = false; }
     };
   };
@@ -5869,9 +6033,12 @@ function createCapture({ view, plugin }) {
     capSuggest?.close();
     $5("#capture-types").innerHTML = TYPES.map(([t, ic, name]) => `<button type="button" data-capture-type="${t}" aria-label="${name}" aria-pressed="${t === type}">${icon(ic)}<span class="capture-type-name" aria-hidden="true">${name}</span></button>`).join("");
     $5("#capture").hidden = !open;
-    $5("#capture-description").hidden = type !== "task";
+    $5("#capture-description").hidden = !["task","schedule"].includes(type);
+    $5("#capture-schedule").hidden=type!=="schedule";
+    $5("#capture-idea-content").hidden=type!=="idea";
+    if(type==="schedule"&&!$5("#capture-schedule-date").value){$5("#capture-schedule-date").value=plugin.clock().date;$5("#capture-schedule-start").value=plugin.clock().time;$5("#capture-schedule-end").value="";}
     $5("#capture-toggle").setAttribute("aria-expanded", String(open));
-    $5("#capture-input").placeholder = { book: "输入书名，回车添加到书籍（可用 #标签）", literature: "输入文献标题，回车添加到文献（可用 #标签）", task: "\u8BB0\u4E00\u4EF6\u4EFB\u52A1\uFF0C\u9ED8\u8BA4\u8FDB\u6536\u4EF6\u7BB1\uFF08\u660E\u5929\u3001#\u6E05\u5355\u3001@\u4EBA\u3001!\u9AD8\uFF09", idea: "\u8BB0\u4E00\u4E2A\u60F3\u6CD5\uFF08#\u6807\u7B7E\uFF09", note: "\u6B64\u523B\u60F3\u5230\u4E86\u4EC0\u4E48", achievement: "\u4ECA\u5929\u505A\u6210\u4E86\u4EC0\u4E48", gratitude: "\u4ECA\u5929\u611F\u8C22\u4EC0\u4E48", project: "\u65B0\u9879\u76EE\u7684\u540D\u5B57" }[type];
+    $5("#capture-input").placeholder = { schedule:"写日程名称，如：阅读、开会、散步", book: "输入书名，回车添加到书籍（可用 #标签）", literature: "输入文献标题，回车添加到文献（可用 #标签）", task: "\u8BB0\u4E00\u4EF6\u4EFB\u52A1\uFF0C\u9ED8\u8BA4\u8FDB\u6536\u4EF6\u7BB1\uFF08\u660E\u5929\u3001#\u6E05\u5355\u3001@\u4EBA\u3001!\u9AD8\uFF09", idea: "想法标题（可用 #标签）", note: "\u6B64\u523B\u60F3\u5230\u4E86\u4EC0\u4E48", achievement: "\u4ECA\u5929\u505A\u6210\u4E86\u4EC0\u4E48", gratitude: "\u4ECA\u5929\u611F\u8C22\u4EC0\u4E48", project: "\u65B0\u9879\u76EE\u7684\u540D\u5B57" }[type];
     view.frames();
   }
   function toggle(force) {
@@ -5917,6 +6084,15 @@ ${line}
     const { date: date2, time } = plugin.clock(), ix = plugin.index, tokens2 = text.match(TOKENS) || [];
     const words = text.replace(TOKENS, " ").replace(/\s+/g, " ").trim() || text;
     let undo = null, label = words, createdLibrary=null;
+    if(type==="schedule"){
+      const date=$5("#capture-schedule-date").value,start=$5("#capture-schedule-start").value,end=$5("#capture-schedule-end").value;
+      if(!date||!start||!end||start===end){view.frame.feedback("请填写日期及不同的开始、结束时间");return;}
+      try{
+        const event={id:crypto.randomUUID(),title:text,start:date+"T"+start,end:(end<start?shiftScheduleDate(date,1):date)+"T"+end,description};
+        await writeDailySchedule(plugin,null,event);view.go("today");view.todayKey=null;view.render(true);view.frame.feedback("已添加日程；点击时间线上的日程可修改时间");
+      }catch(error){view.frame.feedback("日程保存失败："+error.message);}
+      return;
+    }
     if (type === "task") {
       const model = { lists: ix.config.lists.map((l2) => ({ id: l2.title, title: l2.title, archived: l2.archived })), projects: [...ix.projects.values()], people: [...ix.people.values()] };
       const r = parseTask(text, model, date2);
@@ -5962,7 +6138,7 @@ ${line}
       const content = text.replace(TOKENS, m => m.startsWith("#") ? "" : m).trim();
       const [firstLine, ...bodyLines] = content.split("\n");
       const first = firstLine.slice(0, 48), tags = tokens2.filter(t => t.startsWith("#")).map(t => t.slice(1)), path = unique(FOLDERS.ideas, first);
-      await plugin.writer.create(path, "---\n---\n" + bodyLines.join("\n").trim() + "\n");
+      await plugin.writer.create(path, "---\n---\n" + [bodyLines.join("\n").trim(),description.trim()].filter(Boolean).join("\n\n") + "\n");
       await plugin.writer.frontmatter(path, (fm) => {
         fm.stage = "seed";
         fm.created = date2;
@@ -6003,10 +6179,14 @@ ${line}
     $5("#capture-tokens").innerHTML = (v2.match(TOKENS) || []).map((t) => `<span>${esc(t)}</span>`).join("");
   }
   async function submit() {
-    const input = $5("#capture-input"), v2 = input.value, description = type === "task" ? $5("#capture-description").value : "";
+    const input = $5("#capture-input"), v2 = input.value, description = type==="idea" ? $5("#capture-idea-content").value : ["task","schedule"].includes(type) ? $5("#capture-description").value : "";
     if (!v2.trim()) {
       input.focus();
       return;
+    }
+    if(type==="schedule"){
+      const date=$5("#capture-schedule-date").value,start=$5("#capture-schedule-start").value,end=$5("#capture-schedule-end").value;
+      if(!date||!start||!end||start===end){view.frame.feedback("请填写日期及不同的开始、结束时间");return;}
     }
     input.value = "";
     tokens();
@@ -6015,6 +6195,7 @@ ${line}
     render();
     await save(v2, description);
     $5("#capture-description").value = "";
+    $5("#capture-idea-content").value = "";
   }
   view.registerDomEvent(root, "click", (e) => {
     const b3 = e.target.closest("button");
@@ -6049,7 +6230,7 @@ ${line}
   view.registerDomEvent(root, "keydown", (e) => {
     if (!open || !e.target.closest?.("#capture")) return;
     if (e.isComposing || e.keyCode === 229) return;
-    if (e.key === "Enter" && !e.shiftKey && ["capture-input", "capture-description"].includes(e.target.id)) {
+    if (e.key === "Enter" && !e.shiftKey && ["capture-input", "capture-description", "capture-idea-content"].includes(e.target.id)) {
       e.preventDefault();
       e.stopImmediatePropagation();
       submit();
@@ -6842,29 +7023,87 @@ var addDays3 = (d, n) => {
 };
 var RANK = { highest: 0, high: 1, medium: 2, low: 3, lowest: 4 };
 var done = (t) => t.status === "done" || t.status === "cancelled";
-function taskEffortForDay(index,date) {
+function shiftScheduleDate(date,offset){const d=new Date(date+"T12:00:00");d.setDate(d.getDate()+offset);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function scheduleEventsForDay(index,date){
+  const from=new Date(date+"T00:00:00").getTime(),until=new Date(shiftScheduleDate(date,1)+"T00:00:00").getTime(),out=[];
+  for(const day of index.days.values())for(const event of day.schedules||[]){
+    const start=new Date(event.start).getTime(),end=new Date(event.end).getTime();
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||start>=until||end<=from)continue;
+    out.push({...event,id:"schedule:"+day.date+":"+event.id,scheduleId:event.id,originDay:day.date,date,time:start<from?"00:00":event.start.slice(11,16),endTime:end>=until?"24:00":event.end.slice(11,16),allDay:false,startMs:Math.max(start,from),endMs:Math.min(end,until)});
+  }return out.sort((a,b)=>a.time.localeCompare(b.time));
+}
+async function syncScheduleEffort(plugin,dates){
+  let changed=0;
+  for(const date of new Set(dates)){
+    const day=plugin.index.days.get(date)||{},next=taskEffortForDay(plugin.index,date);
+    if(JSON.stringify(next.effort)===JSON.stringify(day.effort||{})&&JSON.stringify(next.auto)===JSON.stringify(day.effortAuto||{}))continue;
+    const path=`${FOLDERS.journal}/${date}.md`;
+    await plugin.writer.frontmatter(path,fm=>{fm.effort=next.effort;fm.effortAuto=next.auto;fm.effortRecorded=true;fm.personalRecord=true;fm.tags=list(fm.tags).filter(t=>t!=="example");});
+    await plugin.index.load(path);changed++;
+  }
+  return changed;
+}
+async function writeDailySchedule(plugin,original,event){
+  if(event&&(!event.title.trim()||!Number.isFinite(Date.parse(event.start))||!Number.isFinite(Date.parse(event.end))||Date.parse(event.end)<=Date.parse(event.start)))throw new Error("请填写有效名称和起止时间");
+  const date=event?.start.slice(0,10),oldDate=original?.originDay,affected=[];
+  if(original)affected.push(original.start.slice(0,10),original.end.slice(0,10));
+  if(event){
+    affected.push(date,event.end.slice(0,10));
+    await plugin.writer.frontmatter(`${FOLDERS.journal}/${date}.md`,fm=>{fm.schedules=[...(fm.schedules||[]).filter(e=>e.id!==event.id),event];fm.personalRecord=true;fm.tags=list(fm.tags).filter(t=>t!=="example");});
+    await plugin.index.load(`${FOLDERS.journal}/${date}.md`);
+  }
+  if(original&&(!event||oldDate!==date)){
+    await plugin.writer.frontmatter(`${FOLDERS.journal}/${oldDate}.md`,fm=>{fm.schedules=(fm.schedules||[]).filter(e=>e.id!==original.scheduleId);});
+    await plugin.index.load(`${FOLDERS.journal}/${oldDate}.md`);
+  }
+  await syncScheduleEffort(plugin,affected);plugin.index.emit();
+}
+function openScheduleEditor(view,plugin,event=null){
+  const modal=new import_obsidian7.Modal(plugin.app);modal.titleEl.setText(event?"编辑日程":"添加日程");
+  const box=modal.contentEl,field=(label,type,value)=>{const wrap=box.createDiv();wrap.style.cssText="display:grid;grid-template-columns:75px 1fr;gap:10px;align-items:center;margin:10px 0";wrap.createEl("label",{text:label});const input=wrap.createEl("input",{type,value});input.style.width="100%";return input;};
+  const title=field("日程","text",event?.title||""),start=field("开始","datetime-local",event?.start||plugin.clock().date+"T"+plugin.clock().time),end=field("结束","datetime-local",event?.end||""),description=field("说明","text",event?.description||"");
+  const duration=box.createEl("p"),error=box.createEl("p");error.style.color="var(--text-error)";
+  const preview=()=>{const h=(Date.parse(end.value)-Date.parse(start.value))/36e5;duration.textContent=Number.isFinite(h)&&h>0?`时长 ${formatEffortHours(h)}h` : "请填写晚于开始的结束时间";};start.oninput=preview;end.oninput=preview;preview();
+  let busy=false;const save=async()=>{if(busy)return;busy=true;try{await writeDailySchedule(plugin,event,{id:event?.scheduleId||crypto.randomUUID(),title:title.value.trim(),start:start.value,end:end.value,description:description.value.trim()});modal.close();view.todayKey=null;view.render(true);}catch(e){error.textContent=e.message;}finally{busy=false;}};
+  const buttons=box.createDiv();buttons.style.cssText="display:flex;gap:12px;margin-top:16px";buttons.createEl("button",{text:"保存",cls:"mod-cta"}).onclick=save;
+  if(event)buttons.createEl("button",{text:"删除日程"}).onclick=async()=>{if(busy)return;busy=true;try{await writeDailySchedule(plugin,event,null);modal.close();view.todayKey=null;view.render(true);}catch(e){error.textContent=e.message;busy=false;}};
+  box.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();save();}});modal.open();
+}
+function installScheduleEditing(view,plugin){
+  view.registerDomEvent(view.root,"click",e=>{
+    const b=e.target.closest?.('[data-event],[data-edit-schedule],[data-new-schedule]');if(!b)return;
+    const id=b.dataset.event||b.dataset.editSchedule;
+    if(!b.hasAttribute("data-new-schedule")&&!id?.startsWith("schedule:"))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    if(b.hasAttribute("data-new-schedule")){openScheduleEditor(view,plugin);return;}
+    for(const day of plugin.index.days.values())for(const event of day.schedules||[])if("schedule:"+day.date+":"+event.id===id){openScheduleEditor(view,plugin,{...event,originDay:day.date,scheduleId:event.id});return;}
+  },{capture:true});
+}
+function taskEffortForDay(index,date,now=Date.now()) {
   const day=index.days.get(date)||{}, effort={...(day.effort||{})}, previous=day.effortAuto||{}, auto={}, events=[];
   for(const task of index.tasks.values())if(!index.examples?.has(task.id)&&task.status!=="cancelled") {
-    if(task.date===date&&task.time&&task.endTime)events.push(task);
+    if(task.date===date&&task.time&&task.endTime&&!scheduleEventsForDay(index,date).some(e=>e.title===task.title&&e.time===task.time&&e.endTime===task.endTime))events.push(task);
     else if(task.status==="done"&&(task.completed||task.date)===date && !(task.title in effort))effort[task.title]=null;
   }
   for(const event of index.events||[])if(event.date===date&&!event.allDay&&event.time&&event.endTime&&!events.some(t=>t.title===event.title&&t.time===event.time&&t.endTime===event.endTime))events.push(event);
   for(const event of events){const duration=sleepDuration(event.time,event.endTime);if(duration!=null&&duration>0)auto[event.title]=(auto[event.title]||0)+duration;}
-  for(const [title,hours]of Object.entries(auto))if(!(title in effort)||effort[title]==null||effort[title]===previous[title])effort[title]=formatEffortHours(hours);
+  const scheduleTitles=new Set();
+  for(const event of scheduleEventsForDay(index,date)){
+    const hours=Math.max(0,Math.min(event.endMs,now)-event.startMs)/36e5;
+    if(hours>0){auto[event.title]=(auto[event.title]||0)+hours;scheduleTitles.add(event.title);}
+  }
+  for(const [title,hours]of Object.entries(auto))if(scheduleTitles.has(title)||!(title in effort)||effort[title]==null||effort[title]===previous[title])effort[title]=formatEffortHours(hours);
   for(const [title,value]of Object.entries(previous))if(!(title in auto)&&effort[title]===value)delete effort[title];
   return {effort,auto:Object.fromEntries(Object.entries(auto).map(([k,v])=>[k,formatEffortHours(v)]))};
 }
 function installAutoEffort(view,plugin){
   let running=false;
   const sync=async()=>{if(running)return;running=true;try{
-    const date=plugin.clock().date,day=plugin.index.days.get(date)||{},next=taskEffortForDay(plugin.index,date);
-    if(JSON.stringify(next.effort)===JSON.stringify(day.effort||{})&&JSON.stringify(next.auto)===JSON.stringify(day.effortAuto||{}))return;
-    const path=`${FOLDERS.journal}/${date}.md`;
-    if(!plugin.app.vault.getAbstractFileByPath(path))await plugin.writer.create(path,"---\n---\n");
-    await plugin.writer.frontmatter(path,fm=>{fm.effort=next.effort;fm.effortAuto=next.auto;fm.effortRecorded=true;fm.personalRecord=true;fm.tags=list(fm.tags).filter(t=>t!=="example");});
-    await plugin.index.load(path);plugin.index.emit();
+    const date=plugin.clock().date;
+    const changed=await syncScheduleEffort(plugin,[date,shiftScheduleDate(date,-1)]);
+    if(changed)plugin.index.emit();
   }catch(error){console.error("Tideline automatic effort",error);}finally{running=false;}};
-  const off=plugin.index.subscribe(sync);view.register(off);sync();
+  const off=plugin.index.subscribe(sync);view.register(off);view.registerInterval(window.setInterval(()=>{sync();view.todayKey=null;view.schedule();},60000));sync();
 }
 function compareDailyTasks(a,b) {
   return (a.order??1e9)-(b.order??1e9)||(RANK[a.priority]??9)-(RANK[b.priority]??9)||a.title.localeCompare(b.title,"zh");
@@ -6976,7 +7215,7 @@ function dayView(index, date2, time) {
   const investments = Object.entries(taskEffortForDay(index,date2).effort).map(([title, hours2]) => ({ id: title, title, hours: hours2==null?null:Number(hours2)||0 })).sort((a,b)=>(b.hours??-1)-(a.hours??-1));
   const calendarEvents = index.events.filter((e) => e.date === date2 && !e.allDay && e.time);
   const timedTasks = tasks.filter(t => t.date === date2 && t.time && t.status !== "cancelled").filter(t => !calendarEvents.some(e => e.time === t.time && e.title === t.title)).map(t => ({ id: "task-event:" + t.id, date: date2, time: t.time, endTime: t.endTime, title: t.title, description: t.description || (t.project ? "项目：" + t.project : "已安排时间的任务"), allDay: false }));
-  const events = [...calendarEvents, ...timedTasks].sort((a2, b3) => a2.time.localeCompare(b3.time));
+  const events = [...calendarEvents,...scheduleEventsForDay(index,date2)].sort((a,b)=>a.time.localeCompare(b.time));
   const md7 = date2.slice(4), years = [...index.days.values()].filter((d) => d.date.slice(4) === md7 && d.date < date2).sort((a2, b3) => b3.date.localeCompare(a2.date));
   const quoted = years.find((y2) => y2.highlight);
   const past = quoted ? { text: quoted.highlight, year: quoted.date.slice(0, 4), path: quoted.path, more: years.filter((y2) => y2 !== quoted && y2.done.length).slice(0, 1).map((y2) => ({ year: y2.date.slice(0, 4), item: y2.done[0] })) } : null;
@@ -7410,13 +7649,13 @@ function createR12Art(a2) {
       d.cache.r12Sky = { key, canvas: c, width, height, pixels: im.data, palette: p };
     }
     const el = HOST.querySelector("#sky"), style = getComputedStyle(el), left = parseFloat(style.left) || 0, right = parseFloat(style.right) || 0;
-    d.cache.skyFrame = { left, top: parseFloat(style.top) || 0, width: HOST.querySelector("#sheet").clientWidth - left - right, height: parseFloat(style.height) || 243 };
+    d.cache.skyFrame = { left, top: parseFloat(style.top) || 0, width: tidelineSheetWidth(HOST.querySelector("#sheet")) - left - right, height: parseFloat(style.height) || 243 };
     Object.assign(el.style, { maskImage: "none", webkitMaskImage: "none", backgroundColor: "transparent", backgroundImage: "none", opacity: "1" });
     if (el.firstElementChild !== d.cache.r12Sky.canvas) el.replaceChildren(d.cache.r12Sky.canvas);
     const m2 = minutes2();
     return m2 < 360 || m2 >= 1140 ? "night" : m2 < 480 ? "dawn" : m2 >= 1020 ? "dusk" : "day";
   }
-  function skyPixel(x2, y2, w2 = HOST.querySelector("#sheet").clientWidth) {
+  function skyPixel(x2, y2, w2 = tidelineSheetWidth(HOST.querySelector("#sheet"))) {
     if (!d.cache.r12Sky || !d.cache.skyFrame) sky();
     const s = d.cache.r12Sky, f = d.cache.skyFrame;
     if (x2 < f.left || x2 > f.left + f.width || y2 < f.top || y2 > f.top + f.height) return [244, 245, 242];
@@ -9335,7 +9574,7 @@ function taskPage(a2) {
     if (f.kind === "inbox") return !t.listId && !t.projectId;
     if (f.kind === "person") return t.discuss && t.peopleIds.includes(f.id);
     if (f.kind === "project") return t.projectId === f.id;
-    if (f.kind === "today") return t.date === d.clock.date;
+    if (f.kind === "today") return t.date===d.clock.date||!!t.date&&t.date<d.clock.date&&!done(t);
     if (f.kind === "discuss") return t.discuss;
     return !d.lists.find((l2) => l2.id === t.listId)?.archived;
   }
@@ -9429,7 +9668,7 @@ ${t.markdown ?? t.description ?? ""}`)}</pre>` : ""}</article>`;
   }
   function navigation() {
     const f = d.ui.taskFilter, N3 = (filter) => d.tasks.filter((t) => t.status !== "done" && filter(t)).length, nav = (key, id, label, ic, n, active) => B3(key, id, (art.navGlyph(ic) || G3(ic)) + `<span>${esc2(label)}</span>${n === void 0 ? "" : `<span class="mono cargo-nav-number">${n}</span>`}`, label, `aria-pressed="${active}"`);
-    return `<aside class="cargo-nav" aria-label="\u8D27\u5355\u7B5B\u9009"><div>${nav("task-nav-all", "", "\u5168\u90E8", "lines", void 0, f.kind === "all")}${nav("task-nav-today", "", "\u4ECA\u5929", "sunrise", N3((t) => t.date === d.clock.date), f.kind === "today")}${nav("task-filter-next", "", "\u63A5\u4E0B\u6765", "calendar", N3((t) => t.date > d.clock.date && t.date <= nextWeek()), f.kind === "next")}${nav("task-nav-inbox", "", "\u6536\u4EF6\u7BB1", "tray", N3((t) => !t.listId && !t.projectId), f.kind === "inbox")}</div><div>${d.lists.filter((l2) => !l2.archived).sort((a, b) => count(b.id) - count(a.id) || Number(/^[\u3400-\u9fff]/.test(a.title.trim())) - Number(/^[\u3400-\u9fff]/.test(b.title.trim())) || a.title.localeCompare(b.title, "zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true })).map((l2) => nav("task-nav-list", l2.id, l2.title, "crate", count(l2.id), f.kind === "list" && f.id === l2.id)).join("")}${B3("task-nav-new-list", "", icon2("plus"), "\u65B0\u5EFA\u6E05\u5355", 'class="cargo-nav-add"')}</div><div>${d.projects.filter((p) => HOST.taskNavProject ? HOST.taskNavProject(p, d) : p.status === "active" && d.tasks.some((t) => t.projectId === p.id)).sort((a,b)=>(HOST.taskProjectCount?.(b,d)||0)-(HOST.taskProjectCount?.(a,d)||0)||a.title.localeCompare(b.title,"zh-Hans-u-co-pinyin",{numeric:true,sensitivity:"base"})).map((p) => nav("task-nav-project", p.id, p.title, "route", HOST.taskProjectCount?.(p, d), f.kind === "project" && f.id === p.id)).join("")}</div></aside>`;
+    return `<aside class="cargo-nav" aria-label="\u8D27\u5355\u7B5B\u9009"><div>${nav("task-nav-all", "", "\u5168\u90E8", "lines", void 0, f.kind === "all")}${nav("task-filter-schedule","","日程","calendar",void 0,f.kind==="schedule")}${nav("task-nav-today", "", "\u4ECA\u5929", "sunrise", N3((t) => t.date && t.date <= d.clock.date), f.kind === "today")}${nav("task-filter-next", "", "\u63A5\u4E0B\u6765", "calendar", N3((t) => t.date > d.clock.date && t.date <= nextWeek()), f.kind === "next")}${nav("task-nav-inbox", "", "\u6536\u4EF6\u7BB1", "tray", N3((t) => !t.listId && !t.projectId), f.kind === "inbox")}</div><div>${d.lists.filter((l2) => !l2.archived).sort((a, b) => count(b.id) - count(a.id) || Number(/^[\u3400-\u9fff]/.test(a.title.trim())) - Number(/^[\u3400-\u9fff]/.test(b.title.trim())) || a.title.localeCompare(b.title, "zh-Hans-u-co-pinyin", { sensitivity: "base", numeric: true })).map((l2) => nav("task-nav-list", l2.id, l2.title, "crate", count(l2.id), f.kind === "list" && f.id === l2.id)).join("")}${B3("task-nav-new-list", "", icon2("plus"), "\u65B0\u5EFA\u6E05\u5355", 'class="cargo-nav-add"')}</div><div>${d.projects.filter((p) => HOST.taskNavProject ? HOST.taskNavProject(p, d) : p.status === "active" && d.tasks.some((t) => t.projectId === p.id)).sort((a,b)=>(HOST.taskProjectCount?.(b,d)||0)-(HOST.taskProjectCount?.(a,d)||0)||a.title.localeCompare(b.title,"zh-Hans-u-co-pinyin",{numeric:true,sensitivity:"base"})).map((p) => nav("task-nav-project", p.id, p.title, "route", HOST.taskProjectCount?.(p, d), f.kind === "project" && f.id === p.id)).join("")}</div></aside>`;
   }
   function nextWeek() {
     const date2 = /* @__PURE__ */ new Date(d.clock.date + "T12:00:00Z");
@@ -9449,6 +9688,11 @@ ${t.markdown ?? t.description ?? ""}`)}</pre>` : ""}</article>`;
     if (d.ui.taskMenu && get(d.ui.taskMenu)) root.insertAdjacentHTML("beforeend", taskMenu(get(d.ui.taskMenu)));
     art.place(root);
     fitList();
+    if(f.kind==="schedule"){
+      const entries=(d.schedules||[]).filter(e=>Date.parse(e.end)>Date.now()),left=root.querySelector(".cargo-left-pane"),right=root.querySelector(".cargo-detail-pane");
+      left.innerHTML=`<header class="schedule-list-heading"><strong>日程</strong><button type="button" data-new-schedule aria-label="添加日程">＋</button></header><div class="cargo-manifest schedule-manifest">${entries.map(e=>`<button type="button" class="schedule-list-row" data-edit-schedule="${esc2(e.key)}"><time>${esc2(e.start.slice(0,10))}<br>${esc2(e.start.slice(11,16))} – ${esc2(e.end.slice(0,10)!==e.start.slice(0,10)?"次日 ":"")}${esc2(e.end.slice(11,16))}</time><span>${esc2(e.title)}</span></button>`).join("")||'<p>暂无接下来的日程。点击＋或使用“记录 → 日程”添加。</p>'}</div>`;
+      right.innerHTML='<section class="schedule-explanation"><h3>按时间安排，按实际经过统计</h3><p>日程独立于任务。点击一条安排修改起止时间，也可在今日时间线上修改。</p><p>未来日程暂不计投入；进行中按已过时间累计；结束后计入完整时长。</p></section>';
+    }
     root.querySelector(".cargo-manifest").scrollTop = scroll;
     d.cache.taskScrollReset = false;
     d.cache.taskScroll = scroll;
@@ -9542,6 +9786,7 @@ ${t.markdown ?? t.description ?? ""}`)}</pre>` : ""}</article>`;
       d.ui.taskQuery = "";
       selectForFilter();
     } else if (key === "task-filter-next") changeFilter({ kind: "next" });
+    else if(key === "task-filter-schedule")changeFilter({kind:"schedule"});
     else if (key === "task-filter-today") changeFilter({ kind: "today" });
     else if (key === "task-filter-inbox") changeFilter({ kind: "inbox" });
     else if (key === "task-filter-done") changeFilter({ kind: d.ui.taskFilter.kind === "done" ? "all" : "done" });
@@ -10307,13 +10552,14 @@ function reviewPage(a2) {
       bar += ink2([[x2 + 2, 6], [x2 + len - 2, 6]], 5, shades[i % shades.length]);
       x2 += len;
     });
+    const edit = (kind,label) => `<button type="button" class="review-day-edit" data-review-edit="${kind}" data-review-date="${esc2(r.date)}" aria-label="修改${label}" title="修改${label}">修改</button>`;
     const head = `<div class="log-page-head"><div class="log-date">${fmt(r.date)}</div><span class="log-weekday">${weekday2(r.date)}</span></div>`;
     const left = `<div class="log-right log-scroll log-day">${head}
  <section class="log-sec"><h4>${G3("route")}<span>\u822A\u8FF9</span><small class="mono">\u5B8C\u6210 ${r.done.length} / ${total}</small></h4><div class="log-trail" role="img" aria-label="\u5B8C\u6210 ${r.done.length} \u4EF6\uFF0C\u5171 ${total} \u4EF6">${svg3(trail, 330, 22)}</div><div class="log-trail-names">${r.done.map((t) => B3("open-object", t.id, esc2(t.title), "\u6253\u5F00\u4EFB\u52A1 " + t.title, 'data-kind="task"')).join("")}</div></section>
- <section class="log-sec"><h4>${icon2("check")}<span>\u4E60\u60EF</span><small class="mono">${habitsDone} / ${d.habits.length}</small></h4><div class="log-habits">${d.habits.map((h, i) => `<span class="log-habit">${habitMark(r.habits[i])}<small>${esc2(h.name)}</small></span>`).join("")}</div></section>
- <section class="log-sec"><h4>${G3("goal")}<span>\u6BCF\u65E5\u95EE\u9898</span></h4>${d.questions.map((q2, i) => `<div class="log-question"><span class="mono">${i + 1}</span><span>${esc2(q2.title)}</span><span class="mono">${r.questions[i] == null ? "\u2014" : r.questions[i] + " / 10"}</span></div>`).join("")}</section>
- <section class="log-sec review-sleep-readonly">${icon2("moon",18)}<strong>睡眠</strong><span>${esc2(r.sleepStart||"—")} - ${esc2(r.sleepEnd||"—")} ${r.sleepHours==null?"—":formatEffortHours(r.sleepHours)+"h"}</span></section>
- <section class="log-sec"><h4>${icon2("sunrise")}<span>\u65F6\u95F4\u6295\u5165</span><small class="mono">${formatEffortHours(hours2)}h</small></h4><div class="log-hours-bar">${svg3(bar, 320, 12)}</div><div class="log-hours">${r.investments.map((inv, i) => `<span><i style="background:${shades[i % shades.length]}"></i>${esc2(inv.title)}<b class="mono">${formatEffortHours(inv.hours)}h</b></span>`).join("")}</div></section>
+ <section class="log-sec"><h4>${icon2("check")}<span>\u4E60\u60EF</span><small class="mono">${habitsDone} / ${d.habits.length}</small>${edit("habits","习惯")}</h4><div class="log-habits">${d.habits.map((h, i) => `<button type="button" class="log-habit review-habit-edit" data-review-edit="habits" data-review-date="${esc2(r.date)}" aria-label="修改习惯：${esc2(h.name)}">${habitMark(r.habits[i])}<small>${esc2(h.name)}</small></button>`).join("")}</div></section>
+ <section class="log-sec"><h4>${G3("goal")}<span>\u6BCF\u65E5\u95EE\u9898</span>${edit("scores","每日问题评分")}</h4>${d.questions.map((q2, i) => `<div class="log-question"><span class="mono">${i + 1}</span><span>${esc2(q2.title)}</span><button type="button" class="mono review-score-edit" data-review-edit="scores" data-review-date="${esc2(r.date)}" aria-label="修改评分：${esc2(q2.title)}">${r.questions[i] == null ? "\u2014" : r.questions[i] + " / 10"}</button></div>`).join("")}</section>
+ <section class="log-sec review-sleep-readonly">${icon2("moon",18)}<strong>睡眠</strong><span>${esc2(r.sleepStart||"—")} - ${esc2(r.sleepEnd||"—")} ${r.sleepHours==null?"—":formatEffortHours(r.sleepHours)+"h"}</span>${edit("sleep","睡眠时间")}</section>
+ <section class="log-sec"><h4>${icon2("sunrise")}<span>\u65F6\u95F4\u6295\u5165</span><small class="mono">${formatEffortHours(hours2)}h</small><button type="button" class="review-day-edit" data-review-effort="${esc2(r.date)}" aria-label="修改投入时长">修改</button></h4><div class="log-hours-bar">${svg3(bar, 320, 12)}</div><div class="log-hours">${r.investments.map((inv, i) => `<span><i style="background:${shades[i % shades.length]}"></i>${esc2(inv.title)}<b class="mono">${formatEffortHours(inv.hours)}h</b></span>`).join("")}</div></section>
  <div class="log-notes"><section><h4>${icon2("note")}<span>\u968F\u624B\u8BB0</span></h4>${r.journal.map((n) => `<p><time class="mono">${n.time}</time>${esc2(n.text)}</p>`).join("") || '<p class="log-none">\u2014</p>'}</section></div></div>`;
     const md7 = r.date.slice(5), right = `<div class="log-left log-day-memories"><div class="log-past log-scroll log-day-history"><div class="log-page-head"><h4 class="log-past-title">\u5F80\u5E74\u4ECA\u65E5</h4><span class="log-weekday">${fmt(r.date)}</span></div>${(() => { const previous=String(Number(r.date.slice(0,4))-1)+r.date.slice(4), record=d.review.history?.[previous];return record && (record.quote || record.journal.length) ? `<article class="log-year"><div><h5>${esc2(previous)}</h5>${record.quote?`<h4>本日寄语</h4><blockquote>${esc2(record.quote)}</blockquote>`:""}${record.journal.length?`<h4>随手记</h4>${record.journal.map(note=>`<p><time class="mono">${esc2(note.time||"")}</time> ${esc2(note.text||"")}</p>`).join("")}`:""}</div></article>`:`<p class="log-none">去年今日暂无寄语和随手记</p>`;})()}</div><div class="log-day-reflections"><section><h4>${icon2("flag")}<span>\u6210\u5C31</span></h4>${r.achievements.map((t) => `<p>${esc2(t)}</p>`).join("") || '<p class="log-none">\u2014</p>'}</section><section><h4>${G3("lead")}<span>\u611F\u6069</span></h4>${r.gratitude.map((t) => `<p>${esc2(t)}</p>`).join("") || '<p class="log-none">\u2014</p>'}</section></div></div>`;
     return left + right + `<nav class="log-day-turners" aria-label="按天翻页">${B3("review-prev", "", G3("left"), "前一天", `class="log-day-turn log-day-turn-prev"${r.date <= (d.review.firstDate || "") ? " disabled" : ""}`)}${B3("review-next", "", G3("right"), "后一天", `class="log-day-turn log-day-turn-next"${r.date >= d.clock.date ? " disabled" : ""}`)}</nav>`;
@@ -12926,6 +13172,28 @@ function reviewSlice(ix, d, date2, dayOf) {
   };
 }
 
+function projectInvestmentNames(project,tasks) {
+  const names=new Set([project.title]),byId=new Map(tasks.map(t=>[t.id,t]));
+  for(const task of tasks){
+    let current=task;const seen=new Set();
+    while(current&&!seen.has(current.id)){
+      seen.add(current.id);
+      if(current.projectId){if(current.projectId===project.id)names.add(task.title);break;}
+      current=byId.get(current.parentId);
+    }
+  }
+  return names;
+}
+function weeklyGoalInvestment(goalTitle,projects,tasks,effort) {
+  const allNames=new Set(),sum=names=>[...names].reduce((total,name)=>total+Math.max(0,Number(effort[name])||0),0);
+  const byProject=projects.map(project=>{
+    const names=projectInvestmentNames(project,tasks);for(const name of names)allNames.add(name);
+    return {id:project.id,title:project.title,hours:formatEffortHours(sum(names))};
+  });
+  if(!allNames.has(goalTitle)&&Number(effort[goalTitle])>0)byProject.push({id:null,title:"直接投入 · "+goalTitle,hours:formatEffortHours(effort[goalTitle])});
+  allNames.add(goalTitle);
+  return {byProject,spent:formatEffortHours(sum(allNames))};
+}
 function buildModel(index, clock, prev) {
   const { date: date2, time } = clock, ix = index;
   const byTitle = (map, t) => {
@@ -13027,6 +13295,7 @@ function buildModel(index, clock, prev) {
   d.tasks = reuse(prev?.tasks, d.tasks);
   d.lists = reuse(prev?.lists, d.lists);
   d.projects = reuse(prev?.projects, d.projects);
+  d.schedules=[...ix.days.values()].flatMap(day=>(day.schedules||[]).map(e=>({...e,originDay:day.date,key:"schedule:"+day.date+":"+e.id}))).sort((a,b)=>a.start.localeCompare(b.start));
   d.events = v2.events.map((e) => ({ id: e.id, time: e.time, endTime: e.endTime, title: e.title, description: e.description }));
   d.planningEvents = /* @__PURE__ */ new Map();
   for (const event of ix.events) {
@@ -13045,26 +13314,24 @@ function buildModel(index, clock, prev) {
   const weekStart = HOST.weekStart(date2), weekDates = Array.from({ length: 7 }, (_2, i) => addDays4(weekStart, i));
   const dayOf = makeDayOf(ix);
   const weekEffort = {};
-  const realEffortNames = new Set([...ix.goals.values(), ...ix.projects.values()].filter(item => !EX.has(item.id || item.path)).map(item => item.title));
+  const realEffortNames = new Set([...ix.goals.values(), ...ix.projects.values(), ...ix.tasks.values()].filter(item => !EX.has(item.id || item.path)).map(item => item.title));
   for (const date of weekDates) {
+    if(date>date2)continue;
     const day = ix.days.get(date);
-    for (const [title, value] of Object.entries(day?.effort || {})) {
+    for (const [title, value] of Object.entries(taskEffortForDay(ix,date).effort)) {
       if (EX.has(day?.path) && !day?.effortRecorded && !realEffortNames.has(title)) continue;
       weekEffort[title] = (weekEffort[title] || 0) + (Number(value) || 0);
     }
   }
   d.goals = [...ix.goals.values()].map((g2) => {
     const projectIds = d.projects.filter((p) => p.goalIds.includes(g2.id)).map((p) => p.id);
-    const byProject = projectIds.map((id) => {
-      const p = d.projects.find((x2) => x2.id === id);
-      return { id, title: p.title, hours: +(weekEffort[p.title] || 0).toFixed(2) };
-    });
-    if (!byProject.some(p => p.title === g2.title) && Number(weekEffort[g2.title]) > 0) byProject.push({ id: g2.id, title: "直接投入 · " + g2.title, hours: +Number(weekEffort[g2.title]).toFixed(2) });
+    const {byProject,spent}=weeklyGoalInvestment(g2.title,d.projects.filter(p=>projectIds.includes(p.id)),d.tasks,weekEffort);
+    for(const row of byProject)if(row.id===null)row.id=g2.id;
     return {
       id: g2.id,
       title: g2.title,
       planned: g2.planned,
-      spent: +byProject.reduce((n, x2) => n + x2.hours, 0).toFixed(2),
+      spent,
       status: g2.status || "active",
       due: g2.due || null,
       completed: g2.completed || null,
@@ -20364,6 +20631,8 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
       }catch(error){this.frame.feedback("保存失败："+error.message);}
     });
     this.registerDomEvent(this.root,"click",e=>{
+      const dailyEdit=e.target.closest?.("[data-review-edit][data-review-date]");
+      if(dailyEdit) { e.preventDefault();e.stopImmediatePropagation();openDailyReviewEditor(this,p,dailyEdit.dataset.reviewDate,dailyEdit.dataset.reviewEdit);return; }
       const effort=e.target.closest?.("[data-review-effort]");
       if(effort) { e.preventDefault();e.stopImmediatePropagation();openTodayInvestments(this,p,effort.dataset.reviewEffort);return; }
       const edit=e.target.closest?.("[data-edit-quarter-note]");
@@ -20544,6 +20813,7 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
     this.registerDomEvent(this.root, "keydown", (e) => this.dialKey(e));
     this.unsub = p.index.subscribe(() => this.schedule());
     installAutoEffort(this,p);
+    installScheduleEditing(this,p);
     installTaskSequencing(this,p);
     installRailOrder(this,p);
     this.resize = new ResizeObserver(() => this.schedule());
@@ -20757,6 +21027,10 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
     const svg3 = this.root.querySelector("#scenery");
     const cached = reused && this.scenes[this.page];
     const box2 = cached ? null : this.root.querySelector("#sheet").getBoundingClientRect().toJSON();
+    if (box2) {
+      box2.width = tidelineSheetWidth(this.root.querySelector("#sheet"));
+      box2.right = box2.left + box2.width;
+    }
     if (box2 && (this.page === "tasks" || this.page === "brain")) {
       const sheet = this.root.querySelector("#sheet"), page = this.root.querySelector("#" + this.page);
       box2.height = page.offsetTop + page.offsetHeight;
@@ -20922,9 +21196,13 @@ var CompassView = class _CompassView extends import_obsidian3.ItemView {
     if (!t) return null;
     const { undo } = t.status === "done" ? reopenTask(m2, t) : completeTask(m2, t);
     await lower.settle();
+    this.todayKey = null;
+    this.render(true);
     return async () => {
       undo();
       await lower.settle();
+      this.todayKey = null;
+      this.render(true);
     };
   }
   task(id) {
@@ -21122,6 +21400,45 @@ function obsidianSource(app, plugin) {
       };
     }
   };
+}
+// Investment keys are task titles; keep historical records attached when a task is renamed.
+function renameTaskEffortKeys(fm, oldTitle, newTitle) {
+  let changed = false;
+  for (const field of ["effort", "effortAuto"]) {
+    const records = fm[field];
+    if (!records || typeof records !== "object" || Array.isArray(records) || !Object.prototype.hasOwnProperty.call(records, oldTitle)) continue;
+    const value = records[oldTitle];
+    if (!Object.prototype.hasOwnProperty.call(records, newTitle) || records[newTitle] == null) records[newTitle] = value;
+    else if (value != null && Number.isFinite(Number(value)) && Number.isFinite(Number(records[newTitle]))) {
+      records[newTitle] = Math.round((Number(records[newTitle]) + Number(value)) * 1e6) / 1e6;
+    } else if (value != null) throw new Error("投入记录的时长格式无效，已保留原记录");
+    delete records[oldTitle];
+    changed = true;
+  }
+  return changed;
+}
+function installTaskEffortRenames(plugin) {
+  const app = plugin.app;
+  let queue = Promise.resolve();
+  plugin.registerEvent(app.vault.on("rename", (file, oldPath) => {
+    if (file?.extension !== "md" || !oldPath.startsWith(FOLDERS.tasks + "/")) return;
+    const oldTitle = base(oldPath), newTitle = file.basename;
+    if (!newTitle || oldTitle === newTitle) return;
+    queue = queue.then(async () => {
+      for (const dayFile of app.vault.getMarkdownFiles().filter(f => f.path.startsWith(FOLDERS.journal + "/"))) {
+        // Read the current file rather than a possibly stale index during consecutive renames.
+        const text = await app.vault.cachedRead(dayFile);
+        if (!text.includes(oldTitle)) continue;
+        let changed = false;
+        await app.fileManager.processFrontMatter(dayFile, fm => { changed = renameTaskEffortKeys(fm, oldTitle, newTitle); });
+        if (changed) await plugin.index.load(dayFile.path);
+      }
+      plugin.index.emit();
+    }).catch(error => {
+      console.error("Tideline task investment rename", error);
+      new import_obsidian4.Notice("任务已改名，但同步投入记录失败：" + (error?.message || error));
+    });
+  }));
 }
 function installBookNoteFolders(plugin) {
   const app = plugin.app, vault = app.vault, cache = app.metadataCache;
@@ -21853,6 +22170,7 @@ var CompassPlugin = class extends import_obsidian7.Plugin {
       await this.syncZotero(false);
       await this.index.build();
       installBookNoteFolders(this);
+      installTaskEffortRenames(this);
       this.perf.indexMs = +this.index.stats.built.toFixed(1);
       this.calendars.load().then(() => this.calendars.tick());
       this.registerInterval(window.setInterval(() => this.calendars.tick(), 6e5));
