@@ -4254,3 +4254,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .pd-station.is-drop-target{box-shadow:inset 0 2px 0 var(--now,#C8206A)}
 .compass-root .pd-stations header{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .compass-root .pd-auto-sort{font-size:11px;color:var(--secondary);background:none;border:0;box-shadow:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* 深海页：水面线、文献/书籍标题整体下移，不再和搜索栏、标题挤在一起 */
+.compass-root #library .lib-sea .lib-head{top:84px}

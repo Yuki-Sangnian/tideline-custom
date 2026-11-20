@@ -11417,7 +11417,7 @@ function libraryPage(a2) {
     return closed ? 34 : 40 + links.reduce((sum, l2, i) => sum + Math.ceil(Array.from(l2.label).reduce((n2, c) => n2 + (c.charCodeAt(0) > 255 ? 13 : 7), 0) / Math.max(80, width - 40)) * 19.5 + (i ? 4.9 : 0), 0);
   }
   function seaLayout(w2, h) {
-    const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 96, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
+    const detail2 = !!d.ui.librarySelected, litX = Math.max(140, Math.round(w2 * 0.13)), bookX = Math.round(w2 * 0.43), y0 = 136, small = h < 700, ch = small ? 38 : 42, gap = small ? 8 : 12;
     const litArea = [litX + 26, bookX - 90], bookArea = [bookX + 26, Math.round(w2 * 0.69)], fold = foldMap(), yearOpen = yearOpenMap(), rowOpen = rowOpenMap(), thisYear = Number(String(d.clock.date).slice(0, 4));
     // 阶段里按年份分段：今年的直接排在阶段名下面（不挂年份小绳结），往年的各挂一个小绳结，且让出阶段名下面那行深度范围的位置
     const secLayout = (sections) => {
@@ -12224,9 +12224,9 @@ ${item.conclusion}`)}</pre>` : ""}</div>
     let s = "<g data-library-sea>";
     const hx0 = L3.litX - 90, hx1 = L3.bookX + 120, hull = [[hx0, -2], [hx1, -2], [hx1 - 30, 20], [(hx0 + hx1) / 2, 30], [hx0 + 30, 20]];
     s += `<g data-morph="keel">${F2(hull)}${a2.curve([[hx0, -2], [hx0 + 30, 20], [(hx0 + hx1) / 2, 30], [hx1 - 30, 20], [hx1, -2]], 1.5)}${a2.curve([[hx0 + 14, 6], [(hx0 + hx1) / 2, 16], [hx1 - 14, 6]], 0.6, M2)}${a2.curve([[hx0 + 24, 13], [(hx0 + hx1) / 2, 23], [hx1 - 24, 13]], 0.5, T3)}</g>`;
-    s += a2.curve(Array.from({ length: 25 }, (_2, i) => [i * w2 / 24, 38 + Math.sin(i * 1.3) * 1.4]), 0.8, T3);
+    s += a2.curve(Array.from({ length: 25 }, (_2, i) => [i * w2 / 24, 64 + Math.sin(i * 1.3) * 1.4]), 0.8, T3);
     for (const [x2, kind] of [[L3.litX, "literature"], [L3.bookX, "book"]]) {
-      const top = kind === "literature" ? 22 : 28, bottom = kind === "literature" ? L3.y1 + 44 : L3.y1 + 20;
+      const top = kind === "literature" ? 48 : 54, bottom = kind === "literature" ? L3.y1 + 44 : L3.y1 + 20;
       s += `<g data-morph="${kind === "literature" ? "sounding-rope" : "book-rope"}">${circle2(x2, top, 3.6, 1.1)}${rope(x2, top + 3, bottom)}`;
       for (const v2 of L3.levels.filter((v3) => v3.kind === kind)) {
         const cs = L3.cards.filter((c) => c.kind === kind && c.ky === v2.y), end = cs.length ? Math.max(...cs.map((c) => c.x + c.w - 14)) : x2 + 40;
