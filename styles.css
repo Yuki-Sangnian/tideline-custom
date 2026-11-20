@@ -4228,3 +4228,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .schedule-person[aria-pressed="true"],.modal .schedule-person[aria-pressed="true"]{background:var(--interactive-accent,#4a6);color:var(--text-on-accent,#fff);border-color:transparent}
 .compass-root #capture-schedule .capture-schedule-wide{grid-column:1/-1}
 .compass-root #capture-schedule select{width:100%;min-width:0}
+/* 已划线（已采用 / 搁置）的想法：紧凑成一行 */
+.compass-root .idea-card.idea-settled{padding-top:5px;padding-bottom:5px;margin-bottom:0}
+.compass-root .idea-card.idea-settled .idea-card-title{line-height:1.5;padding-top:0;padding-bottom:0}
+.compass-root .idea-card.idea-settled .idea-card-star,.compass-root .idea-card.idea-settled .idea-project-link{top:50%;transform:translateY(-50%)}
