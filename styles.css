@@ -2685,6 +2685,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #tasks :is(.task-date-month,.task-date-shortcuts){display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 0}
 .compass-root #tasks .task-date-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;row-gap:2px;margin:4px 0 8px}
 .compass-root #tasks .task-date-grid :is(span,button){padding:3px 0}
+.compass-root #tasks .task-date-grid :is(span,button){justify-self:stretch;width:100%;min-width:0;margin:0;box-sizing:border-box;text-align:center}
 .compass-root #tasks .task-date-grid span{color:var(--secondary);font-size:11px}
 .compass-root #tasks .task-date-grid [aria-current="date"]{color:var(--now)}
 .compass-root #tasks .task-date-grid [aria-pressed="true"]{font-weight:700;text-decoration:underline;text-underline-offset:4px}
