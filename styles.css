@@ -4244,3 +4244,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .pd-station:hover .pd-station-edit,.compass-root .pd-station:focus-within .pd-station-edit,.compass-root .pd-station-edit:focus{opacity:.8}
 .compass-root .pd-station-edit:hover{opacity:1;background:color-mix(in srgb,var(--tick) 25%,transparent)}
 .compass-root .pd-station-edit svg{width:13px!important;height:13px!important;background:none!important}
+
+.compass-root .pd-link-toggle{display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;background:none;box-shadow:none;cursor:pointer;flex:none}
+.compass-root .pd-link-toggle svg{width:18px!important;height:18px!important}
+.compass-root .pd-fold-mark{font-size:11px;color:var(--secondary)}
