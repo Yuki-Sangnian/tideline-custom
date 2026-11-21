@@ -10485,7 +10485,7 @@ function projectPage(a2) {
   const stationRows = (p) => milestoneDisplayOrder(p.stations, p.milestoneSort === "manual").map((i) => ({ ...p.stations[i], order: i }));
   const linkToggle = (kind, glyph, label, n) => {
     const open = !!d.ui.projectLinksOpen?.[kind];
-    return B3("project-links-toggle", kind, glyph, (open ? "\u6536\u8D77" : "\u5C55\u5F00") + label, `class="pd-link-toggle" aria-expanded="${open}"`) + `<span class="pd-label">${label}</span><span class="mono pd-count">${n}</span>${n ? `<span class="pd-fold-mark" aria-hidden="true">${open ? "\u25BE" : "\u25B8"}</span>` : ""}`;
+    return `<span class="pd-link-glyph">${glyph}</span><span class="pd-label">${label}</span><span class="mono pd-count">${n}</span>${n ? B3("project-links-toggle", kind, open ? "\u25BE" : "\u25B8", (open ? "\u6536\u8D77" : "\u5C55\u5F00") + label, `class="pd-link-toggle pd-fold-mark" aria-expanded="${open}"`) : ""}`;
   };
   function detail(p) {
     const tasks = d.tasks.filter((t) => t.projectId === p.id).sort(compareProjectTasks), done2 = tasks.filter((t) => t.status === "done").length, who = d.people.find((x2) => x2.id === d.ui.projectPerson), ideas = p.ideaIds.map((id) => d.ideas.find((x2) => x2.id === id)).filter(Boolean), lits = p.literatureIds.map((id) => d.literature.find((x2) => x2.id === id)).filter(Boolean), bar = tasks.length ? done2 / tasks.length : 0;

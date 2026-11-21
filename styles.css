@@ -4275,3 +4275,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 /* 关联目标：加号放在标题后面同一行 */
 .compass-root #projects .pd-links .pd-goal-add-wrap{display:inline-flex;flex:none;flex-basis:auto;padding-left:0;margin:0}
+/* 相关想法 / 相关文献：只有后面的小箭头能展开收起，前面的图标和标题不再是按钮 */
+.compass-root .pd-link-glyph{display:inline-flex;align-items:center;flex:none}
+.compass-root .pd-link-glyph svg{width:18px!important;height:18px!important}
+.compass-root .pd-link-toggle.pd-fold-mark{min-width:22px;min-height:22px;padding:0 4px;color:var(--secondary)}
+.compass-root .pd-link-toggle.pd-fold-mark:is(:hover,:focus-visible){color:var(--ink)}
