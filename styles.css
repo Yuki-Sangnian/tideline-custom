@@ -4273,10 +4273,5 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #library .lib-title-toggle[hidden]{display:none}
 .compass-root #library .lib-title-toggle:is(:hover,:focus-visible){color:var(--ink)}
 
-/* 关联目标：「已完成 N」放在标题后面同一行，展开时是一个浮层，不再把下面的内容往下顶 */
-.compass-root #projects .pd-links .pd-goal-completed{position:relative;flex:none;margin-left:6px}
-.compass-root #projects .pd-links .pd-goal-completed > summary{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--secondary);cursor:pointer;min-height:23px;list-style:none}
-.compass-root #projects .pd-links .pd-goal-completed > summary::-webkit-details-marker{display:none}
-.compass-root #projects .pd-links .pd-goal-completed > summary::before{content:"▸";font-size:10px}
-.compass-root #projects .pd-links .pd-goal-completed[open] > summary::before{content:"▾"}
-.compass-root #projects .pd-links .pd-goal-completed > .pd-goal-scroll{position:absolute;left:0;top:100%;z-index:20;min-width:200px;max-width:320px;max-height:140px;padding:6px 10px;background:var(--paper);box-shadow:0 2px 10px #0002;border-radius:6px;display:flex;flex-direction:column;gap:6px}
+/* 关联目标：加号放在标题后面同一行 */
+.compass-root #projects .pd-links .pd-goal-add-wrap{display:inline-flex;flex:none;flex-basis:auto;padding-left:0;margin:0}
