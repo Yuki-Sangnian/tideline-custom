@@ -4280,3 +4280,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .pd-link-glyph svg{width:18px!important;height:18px!important}
 .compass-root .pd-link-toggle.pd-fold-mark{min-width:22px;min-height:22px;padding:0 4px;color:var(--secondary)}
 .compass-root .pd-link-toggle.pd-fold-mark:is(:hover,:focus-visible){color:var(--ink)}
+/* 思索页每天底下的习惯小圆点可以点：点一下切换状态 */
+.compass-root #thought .day-foot i[data-day-habit]{position:relative;cursor:pointer}
+.compass-root #thought .day-foot i[data-day-habit]::after{content:"";position:absolute;inset:-6px -3px}
+.compass-root #thought .day-foot i[data-day-habit]:is(:hover,:focus-visible){outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--ink) 18%,transparent)}

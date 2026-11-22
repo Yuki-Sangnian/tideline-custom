@@ -2480,7 +2480,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
       const sum = `<p class="day-sum">${tasks.length ? `<span>${date2 ? future ? "\u8BA1\u5212" : "\u5B8C\u6210 " + done2 + " /" : "\u5F85\u6392"} <b class="mono">${date2 && !future ? tasks.length : tasks.length}</b> \u4EF6</span>` : ""}${hrs ? `<span class="mono">${formatEffortHours(hrs)}h</span>` : ""}</p>`;
       const events = (d.planningEvents.get(date2) || []).map((e) => `<div class="day-event" role="listitem"><span class="mono">${esc(e.time || "\u5168\u5929")}</span>${esc(e.title)}</div>`).join("");
       const items = tasks.map((t) => `<div class="plan-task ${t.status === "done" ? "done" : ""}" role="listitem" tabindex="0" draggable="true" data-plan="${esc(t.id)}" aria-label="${esc(t.title)}\uFF0C${date2 || "\u672A\u6392\u671F"}\uFF0C\u53EF\u62D6\u52A8"><button type="button" class="pt-mark" data-complete="${esc(t.id)}" draggable="false" aria-pressed="${t.status === "done"}" aria-label="${t.status === "done" ? "重新打开" : "完成"}：${esc(t.title)}" title="${t.status === "done" ? "重新打开任务" : "标记为已完成"}">${t.status === "done" ? "\u2713" : ""}</button><span class="pt-title">${esc(t.title)}${t.date&&t.date<d.clock.date&&!done(t)?`<small class="overdue-original-date">原截止 ${esc(t.date)}</small>`:""}</span>${t.projectId && proj(t.projectId) ? `<small class="pt-project">${esc(proj(t.projectId).title)}</small>` : ""}</div>`).join("");
-      const foot = habits ? `<div class="day-foot" aria-label="\u4E60\u60EF">${habits.map((v2) => `<i class="${v2 === null ? "is-null" : v2 ? "is-on" : "is-off"}"></i>`).join("")}</div>` : "";
+      const foot = habits ? `<div class="day-foot" aria-label="\u4E60\u60EF">${habits.map((v2, hi) => { const hb = d.habits[hi]; return `<i class="${v2 === null ? "is-null" : v2 ? "is-on" : "is-off"}" role="button" tabindex="0" data-day-habit="${date2}|${esc(hb?.id || "")}" aria-label="${esc(hb?.name || "\u4E60\u60EF")}\uFF1A${v2 === null ? "\u672A\u8BB0\u5F55" : v2 ? "\u5B8C\u6210" : "\u672A\u5B8C\u6210"}\uFF0C\u70B9\u4E00\u4E0B\u5207\u6362" title="${esc(hb?.name || "")}"></i>`; }).join("")}</div>` : "";
       return `<div class="day-column ${isToday ? "is-today" : ""} ${future ? "is-future" : ""}" role="list" data-drop="${date2 || ""}" aria-label="${date2 || "\u672A\u6392\u671F"}">${head}${sum}${events}${items}${foot}<div class="day-add-divider"></div><button type="button" class="day-empty-new" data-day-new="${date2 || ""}" aria-label="\u5728${date2 ? num2 + "\u65E5" : "\u672A\u6392\u671F"}\u8BB0\u4E00\u4EF6\u4EFB\u52A1" title="\u5728\u8FD9\u5929\u8BB0\u4E00\u4EF6\u4EFB\u52A1"><span aria-hidden="true">+</span></button></div>`;
     }).join("");
     renderWeekNote();
@@ -3178,6 +3178,19 @@ function createThought({ core, r12Art, r14Marine, view }) {
   HOST.addEventListener("pointerover", (e) => {
     if (e.target.closest?.("#lighthouse-toggle") && lastBox && d.ui.page === "thought") prewarm(lastBox, true);
   });
+  // 每天底下的习惯小圆点：点一下切换（没记 → 完成 → 没完成 → 没记），写到那一天的日记里
+  const cycleDayHabit = (e) => {
+    const dot = e.target.closest?.("#thought .day-foot [data-day-habit]");
+    if (!dot) return false;
+    const [date2, id] = dot.dataset.dayHabit.split("|");
+    if (!date2 || !id) return true;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    view.actions?.cycleHabit(id, date2);
+    return true;
+  };
+  HOST.addEventListener("click", cycleDayHabit, true);
+  HOST.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") cycleDayHabit(e); }, true);
   const dropColumn = (target) => target?.closest?.("#thought .day-column[data-drop]");
   function indicateDrop(col) {
     const last = $5("#thought .drop-target");
@@ -7373,8 +7386,8 @@ function todayActions(writer, clock) {
       };
     },
     // 习惯三态：没记 → 完成 → 没完成 → 没记（和原型一样点一下换一态）
-    async cycleHabit(id) {
-      await writer.frontmatter(dayPath(clock().date), (fm) => {
+    async cycleHabit(id, date2) {
+      await writer.frontmatter(dayPath(date2 || clock().date), (fm) => {
         fm.personalRecord = true;
         fm.tags = list(fm.tags).filter(tag => tag !== "example");
         fm.habits ??= {};
