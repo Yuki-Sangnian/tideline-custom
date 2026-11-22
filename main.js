@@ -1881,7 +1881,9 @@ function createGoals({ core, view, render }) {
   const linked = (g2) => d.projects.filter((p) => (p.goalIds || []).includes(g2.id));
   const touch = () => view.lower?.touch?.();
   const announce = (msg, undo) => view.frame.feedback(msg, undo);
-  const shown = () => d.goals.filter((g2) => d.ui.goalsDone ? true : g2.status !== "done");
+  // 已达成的目标只在完成的那一周里显示，过了那一周就不再出现在这一行
+  const recentDone = (g2) => g2.status === "done" && !!g2.completed && HOST.weekStart(g2.completed) === HOST.weekStart(today());
+  const shown = () => d.goals.filter((g2) => g2.status !== "done" || (d.ui.goalsDone && recentDone(g2)));
   const overdue = (g2) => g2.due && g2.status !== "done" && g2.due < today();
   d.ui.goalPage ??= 0;
   function goalButton(g2) {
@@ -1896,7 +1898,7 @@ function createGoals({ core, view, render }) {
     const at2 = list2.findIndex((g2) => g2.id === d.ui.goal);
     if (at2 >= 0 && d.ui.goalFlash) d.ui.goalPage = Math.floor(at2 / PER);
     d.ui.goalPage = Math.max(0, Math.min(pages - 1, d.ui.goalPage));
-    const page2 = list2.slice(d.ui.goalPage * PER, d.ui.goalPage * PER + PER), doneCount = d.goals.filter((g2) => g2.status === "done").length;
+    const page2 = list2.slice(d.ui.goalPage * PER, d.ui.goalPage * PER + PER), doneCount = d.goals.filter(recentDone).length;
     const cells = page2.map(goalButton).join("") + (page2.length < PER && d.ui.goalNew ? newForm() : "") + '<span class="goal-filler" aria-hidden="true"></span>'.repeat(Math.max(0, PER - page2.length - (page2.length < PER && d.ui.goalNew ? 1 : 0)));
     const paging = pages > 1 ? `<span class="goal-paging"><button type="button" data-goal-page="-1" aria-label="\u4E0A\u4E00\u9875\u76EE\u6807" ${d.ui.goalPage ? "" : "disabled"}>\u2039</button><span class="mono">${d.ui.goalPage + 1}/${pages}</span><button type="button" data-goal-page="1" aria-label="\u4E0B\u4E00\u9875\u76EE\u6807" ${d.ui.goalPage < pages - 1 ? "" : "disabled"}>\u203A</button></span>` : "";
     const tools = `<div class="goal-tools"><button type="button" class="week-note-toggle" data-action="week-note" aria-label="展开或收起本日寄语">本日寄语</button><button type="button" class="week-note-edit" data-action="week-note-edit" aria-label="编辑本日寄语">编辑</button>${page2.length >= PER && d.ui.goalNew ? newForm() : `<button type="button" class="goal-add" data-goal-act="new" aria-label="\u65B0\u5EFA\u76EE\u6807">${icon("plus", 18)}</button>`}${paging}${doneCount ? `<button type="button" class="goal-done-toggle" data-goal-act="toggle-done" aria-pressed="${!!d.ui.goalsDone}">${d.ui.goalsDone ? "\u6536\u8D77\u5DF2\u8FBE\u6210" : "\u5DF2\u8FBE\u6210 " + doneCount}</button>` : ""}</div>`;
