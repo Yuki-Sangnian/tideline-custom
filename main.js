@@ -13159,7 +13159,13 @@ function automaticQuarter(ix, date) {
   // 配舱：投入记在某个任务上、而这个任务关联了项目的，就按项目合并成一条（项目的总用时）；没关联项目的任务，还是显示任务本身
   const keep = new Set([...ix.projects.values(), ...ix.goals.values()].map(x => x.title)), taskProject = new Map();
   for (const t of ix.tasks.values()) if (t.title && t.project && !taskProject.has(t.title)) taskProject.set(t.title, t.project);
-  const projectOf = name => keep.has(name) ? name : (taskProject.get(name) || name);
+  // 目标算在它所属项目名下：项目的 goals 里列了这个目标，就并进该项目（只属于一个项目时）
+  const goalProject = new Map(), goalTitles = new Map([...ix.goals.values()].map(g => [g.id, g.title]));
+  for (const p of ix.projects.values()) for (const g of p.goals || []) {
+    const gt = goalTitles.get(g) || g;
+    goalProject.set(gt, goalProject.has(gt) && goalProject.get(gt) !== p.title ? null : p.title);
+  }
+  const projectOf = name => ix.projects.size && [...ix.projects.values()].some(p => p.title === name) ? name : (goalProject.get(name) || (keep.has(name) ? name : (taskProject.get(name) || name)));
   const round = n => Math.round(n*10)/10;
   const sum = (a,b) => {
     const days = [...ix.days.values()].filter(r => real(r) && inside(r.date,a,b) && r.date <= date);
