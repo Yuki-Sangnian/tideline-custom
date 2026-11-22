@@ -2437,7 +2437,14 @@ function buildIdeaSkyGraph(ideas, width) {
       current = next;
     }
   });
-  return { nodes, edges };
+  // Two stars sharing several tags get one line, labelled with every shared tag.
+  const merged = new Map();
+  edges.forEach(e => {
+    const key = [e.from.idea.id, e.to.idea.id].sort().join("\u0000");
+    const hit = merged.get(key);
+    if (hit) hit.tag += " \u00B7 " + e.tag; else merged.set(key, { ...e });
+  });
+  return { nodes, edges: [...merged.values()] };
 }
 function createThought({ core, r12Art, r14Marine, view }) {
   const d = core.data, $5 = (s) => HOST.querySelector(s), $$3 = (s) => [...HOST.querySelectorAll(s)];
