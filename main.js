@@ -2677,7 +2677,14 @@ function createThought({ core, r12Art, r14Marine, view }) {
     const previous = $5("#idea-tag-list");
     if (previous) d.cache.tagSidebarScroll = previous.scrollTop;
     $5("#idea-filters").innerHTML = `<div class="idea-filter-header"><button type="button" class="idea-filter ${!d.ui.ideaDate && !d.ui.ideaTag ? "active" : ""}" data-idea-all aria-pressed="${!d.ui.ideaDate && !d.ui.ideaTag}">${icon("nodes")}<span>\u5168\u90E8</span><small class="idea-tag-count mono">${d.ideas.length}</small></button><button type="button" class="idea-tags-edit" data-edit-idea-tags aria-label="${d.ui.editIdeaTags ? "完成标签编辑" : "编辑标签"}" title="编辑标签" aria-pressed="${!!d.ui.editIdeaTags}">${d.ui.editIdeaTags ? "✓" : "✎"}</button></div><div id="idea-tag-list" class="idea-tag-scroll" role="region" aria-label="\u60F3\u6CD5\u6807\u7B7E" tabindex="0">${sortedTags.map((tag) => `<div class="idea-tag-edit-row"><button type="button" class="idea-filter ${d.ui.ideaTag === tag ? "active" : ""}" data-idea-tag-filter="${esc(tag)}" aria-pressed="${d.ui.ideaTag === tag}" title="${esc(tag)} · ${counts.get(tag) || 0} 篇笔记" aria-label="${esc(tag)}，${counts.get(tag) || 0} 篇笔记">${icon("star", 16)}<span>${esc(tag)}</span><small class="idea-tag-count mono">${counts.get(tag) || 0}</small></button>${d.ui.editIdeaTags ? `<button type="button" class="idea-tag-delete" data-delete-idea-tag="${esc(tag)}" aria-label="删除标签：${esc(tag)}" title="移除标签，保留笔记">×</button>` : ""}</div>`).join("")}</div><form id="tag-inline-form" class="tag-inline-create"><span aria-hidden="true">${icon("plus", 16)}</span><span class="tag-input-line"><input id="tag-inline-name" aria-label="\u65B0\u5EFA\u6807\u7B7E" placeholder="\u65B0\u5EFA\u6807\u7B7E" autocomplete="off" value="${esc(d.ui.tagNewName || "")}"><svg viewBox="0 0 128 30" aria-hidden="true">${ink([[0, 28], [64, 27.7], [128, 28]], 0.95, TICK)}</svg></span></form>${d.ui.tagError ? `<p class="tag-inline-error" role="status">${esc(d.ui.tagError)}</p>` : ""}${d.ui.ideaDate ? `<button type="button" class="idea-date-filter" data-idea-all aria-label="\u6E05\u9664\u65E5\u671F\u7B5B\u9009 ${d.ui.ideaDate}"><time>${d.ui.ideaDate}</time><span aria-hidden="true">\xD7</span></button>` : ""}`;
-    $5("#idea-filters").insertAdjacentHTML("beforeend", `<div class="idea-stage-filters" aria-label="想法状态统计">${["seed", "growing", "ready", "adopted", "parked"].map((stage, n) => `<button type="button" data-idea-stage-filter="${stage}" aria-pressed="${d.ui.ideaStageFilter === stage}">${ideaStar({stage})}<span>${["萌芽", "发展中", "成形", "已采用", "搁置"][n]}</span><small class="mono">${d.ideas.filter(i => (i.stage || "seed") === stage).length}</small></button>`).join("")}</div>`);
+    $5("#idea-filters").insertAdjacentHTML("beforeend", `<div class="idea-stage-filters" aria-label="想法状态统计">${(() => {
+      // 「已采用」「搁置」默认折叠：名字上面有一个展开/折叠按钮；正在按这两个状态筛选时保持展开
+      const open = !!d.ui.ideaSettledOpen || ["adopted", "parked"].includes(d.ui.ideaStageFilter);
+      const row = (stage, n) => `<button type="button" data-idea-stage-filter="${stage}" aria-pressed="${d.ui.ideaStageFilter === stage}">${ideaStar({stage})}<span>${["萌芽", "发展中", "成形", "已采用", "搁置"][n]}</span><small class="mono">${d.ideas.filter(i => (i.stage || "seed") === stage).length}</small></button>`;
+      const settled = d.ideas.filter(i => ["adopted", "parked"].includes(i.stage)).length;
+      const fold = `<button type="button" class="idea-stage-fold" data-idea-settled-toggle aria-expanded="${open}" aria-label="${open ? "折叠已采用和搁置" : "展开已采用和搁置"}"><span class="idea-stage-fold-mark">${open ? "▾" : "▸"}</span><span>${open ? "折叠" : "展开"}</span>${open ? "" : `<small class="mono">${settled}</small>`}</button>`;
+      return ["seed", "growing", "ready"].map(row).join("") + fold + (open ? [3, 4].map((n) => row(["seed", "growing", "ready", "adopted", "parked"][n], n)).join("") : "");
+    })()}</div>`);
     fitTagSidebar();
     $5("#idea-tag-list").scrollTop = d.cache.tagSidebarScroll || 0;
   }
@@ -2965,6 +2972,11 @@ function createThought({ core, r12Art, r14Marine, view }) {
       d.ui.week = Number(ds.week);
       update();
       return;
+    }
+    if (ds.ideaSettledToggle !== undefined) {
+      d.ui.ideaSettledOpen = !(d.ui.ideaSettledOpen || ["adopted", "parked"].includes(d.ui.ideaStageFilter));
+      if (!d.ui.ideaSettledOpen && ["adopted", "parked"].includes(d.ui.ideaStageFilter)) d.ui.ideaStageFilter = null;
+      update(); return;
     }
     if (ds.ideaStageFilter) {
       d.ui.ideaStageFilter = d.ui.ideaStageFilter === ds.ideaStageFilter ? null : ds.ideaStageFilter;
