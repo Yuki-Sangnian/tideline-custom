@@ -2519,7 +2519,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
     renderHeatmap();
     renderComposerTags();
     $5("#idea-form").dataset.empty = String(!(d.cache.ideaDraft || d.cache.ideaContentDraft || ""));
-    const visible2 = d.ideas.filter((i) => (!d.ui.ideaDate || i.created.slice(0, 10) === d.ui.ideaDate) && (!d.ui.ideaTag || tagsOf(i).includes(d.ui.ideaTag)) && (!d.ui.ideaStageFilter || (i.stage || "seed") === d.ui.ideaStageFilter)).sort((a2, b3) => Number(["adopted", "parked"].includes(a2.stage)) - Number(["adopted", "parked"].includes(b3.stage)) || b3.created.slice(0, 10).localeCompare(a2.created.slice(0, 10)) || (Number(b3.createdAt) || 0) - (Number(a2.createdAt) || 0) || b3.created.localeCompare(a2.created));
+    const visible2 = d.ideas.filter((i) => (!d.ui.ideaDate || i.created.slice(0, 10) === d.ui.ideaDate) && (!(d.ui.ideaFilterTags || []).length || d.ui.ideaFilterTags.every(tag => tagsOf(i).includes(tag))) && (!d.ui.ideaStageFilter || (i.stage || "seed") === d.ui.ideaStageFilter)).sort((a2, b3) => Number(["adopted", "parked"].includes(a2.stage)) - Number(["adopted", "parked"].includes(b3.stage)) || b3.created.slice(0, 10).localeCompare(a2.created.slice(0, 10)) || (Number(b3.createdAt) || 0) - (Number(a2.createdAt) || 0) || b3.created.localeCompare(a2.created));
     if (!visible2.some((i) => i.id === d.ui.idea)) { d.ui.idea = null; d.ui.ideaExpanded = false; }
     const feed = $5("#idea-list"), scroll = feed.scrollTop;
     // 「已采用」「搁置」的想法收在列表底部的一个折叠按钮下面，默认折叠
@@ -2679,13 +2679,21 @@ function createThought({ core, r12Art, r14Marine, view }) {
   const addIdeaTagTo = (id, tag, close) => changeIdeaTags(id, (t) => t.includes(cleanTag(tag)) ? t : [...t, tag], close, "\u5DF2\u52A0\u4E0A\u6807\u7B7E\uFF1A" + cleanTag(tag));
   const removeIdeaTagFrom = (id, tag, close) => changeIdeaTags(id, (t) => t.filter((x) => x !== tag), close, "\u5DF2\u53BB\u6389\u6807\u7B7E\uFF1A" + tag);
   function renderIdeaTagFilters() {
-    const counts = new Map();
-    for (const idea of d.ideas) for (const tag of tagsOf(idea)) counts.set(tag, (counts.get(tag) || 0) + 1);
-    const sortedTags = ideaTagNames().slice().sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0) || a.localeCompare(b, "zh-Hans-u-co-pinyin", { numeric: true, sensitivity: "base" }));
+    // 左边的标签只数「还在进行」的想法：已采用、搁置的不计入；一个标签下的想法全都已采用 / 搁置时，这个标签不再显示（编辑标签时仍全部显示）
+    const counts = new Map(), allCounts = new Map();
+    for (const idea of d.ideas) {
+      const settled = ["adopted", "parked"].includes(idea.stage);
+      for (const tag of tagsOf(idea)) {
+        allCounts.set(tag, (allCounts.get(tag) || 0) + 1);
+        if (!settled) counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
+    }
+    const sortedTags = ideaTagNames().filter((tag) => d.ui.editIdeaTags || (counts.get(tag) || 0) > 0 || !allCounts.get(tag) || (d.ui.ideaFilterTags || []).includes(tag) || d.ui.ideaTag === tag).sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0) || a.localeCompare(b, "zh-Hans-u-co-pinyin", { numeric: true, sensitivity: "base" }));
     const previous = $5("#idea-tag-list");
     if (previous) d.cache.tagSidebarScroll = previous.scrollTop;
-    $5("#idea-filters").innerHTML = `<div class="idea-filter-header"><button type="button" class="idea-filter ${!d.ui.ideaDate && !d.ui.ideaTag ? "active" : ""}" data-idea-all aria-pressed="${!d.ui.ideaDate && !d.ui.ideaTag}">${icon("nodes")}<span>\u5168\u90E8</span><small class="idea-tag-count mono">${d.ideas.length}</small></button><button type="button" class="idea-tags-edit" data-edit-idea-tags aria-label="${d.ui.editIdeaTags ? "完成标签编辑" : "编辑标签"}" title="编辑标签" aria-pressed="${!!d.ui.editIdeaTags}">${d.ui.editIdeaTags ? "✓" : "✎"}</button></div><div id="idea-tag-list" class="idea-tag-scroll" role="region" aria-label="\u60F3\u6CD5\u6807\u7B7E" tabindex="0">${sortedTags.map((tag) => `<div class="idea-tag-edit-row"><button type="button" class="idea-filter ${d.ui.ideaTag === tag ? "active" : ""}" data-idea-tag-filter="${esc(tag)}" aria-pressed="${d.ui.ideaTag === tag}" title="${esc(tag)} · ${counts.get(tag) || 0} 篇笔记" aria-label="${esc(tag)}，${counts.get(tag) || 0} 篇笔记">${icon("star", 16)}<span>${esc(tag)}</span><small class="idea-tag-count mono">${counts.get(tag) || 0}</small></button>${d.ui.editIdeaTags ? `<button type="button" class="idea-tag-delete" data-delete-idea-tag="${esc(tag)}" aria-label="删除标签：${esc(tag)}" title="移除标签，保留笔记">×</button>` : ""}</div>`).join("")}</div><form id="tag-inline-form" class="tag-inline-create"><span aria-hidden="true">${icon("plus", 16)}</span><span class="tag-input-line"><input id="tag-inline-name" aria-label="\u65B0\u5EFA\u6807\u7B7E" placeholder="\u65B0\u5EFA\u6807\u7B7E" autocomplete="off" value="${esc(d.ui.tagNewName || "")}"><svg viewBox="0 0 128 30" aria-hidden="true">${ink([[0, 28], [64, 27.7], [128, 28]], 0.95, TICK)}</svg></span></form>${d.ui.tagError ? `<p class="tag-inline-error" role="status">${esc(d.ui.tagError)}</p>` : ""}${d.ui.ideaDate ? `<button type="button" class="idea-date-filter" data-idea-all aria-label="\u6E05\u9664\u65E5\u671F\u7B5B\u9009 ${d.ui.ideaDate}"><time>${d.ui.ideaDate}</time><span aria-hidden="true">\xD7</span></button>` : ""}`;
+    $5("#idea-filters").innerHTML = `<div class="idea-filter-header"><button type="button" class="idea-filter ${!d.ui.ideaDate && !d.ui.ideaTag ? "active" : ""}" data-idea-all aria-pressed="${!d.ui.ideaDate && !d.ui.ideaTag}">${icon("nodes")}<span>\u5168\u90E8</span><small class="idea-tag-count mono">${d.ideas.length}</small></button><button type="button" class="idea-tags-edit" data-edit-idea-tags aria-label="${d.ui.editIdeaTags ? "完成标签编辑" : "编辑标签"}" title="编辑标签" aria-pressed="${!!d.ui.editIdeaTags}">${d.ui.editIdeaTags ? "✓" : "✎"}</button></div><div id="idea-tag-list" class="idea-tag-scroll" role="region" aria-label="\u60F3\u6CD5\u6807\u7B7E" tabindex="0">${(d.ui.ideaTagsExpanded ? sortedTags : sortedTags.slice(0,10)).map((tag) => `<div class="idea-tag-edit-row"><button type="button" class="idea-filter ${(d.ui.ideaFilterTags || []).includes(tag) ? "active" : ""}" data-idea-tag-filter="${esc(tag)}" aria-pressed="${(d.ui.ideaFilterTags || []).includes(tag)}" title="${esc(tag)} · ${counts.get(tag) || 0} 篇笔记" aria-label="${esc(tag)}，${counts.get(tag) || 0} 篇笔记">${icon("star", 16)}<span>${esc(tag)}</span><small class="idea-tag-count mono">${counts.get(tag) || 0}</small></button>${d.ui.editIdeaTags ? `<button type="button" class="idea-tag-delete" data-delete-idea-tag="${esc(tag)}" aria-label="删除标签：${esc(tag)}" title="移除标签，保留笔记">×</button>` : ""}</div>`).join("")}</div><form id="tag-inline-form" class="tag-inline-create"><span aria-hidden="true">${icon("plus", 16)}</span><span class="tag-input-line"><input id="tag-inline-name" aria-label="\u65B0\u5EFA\u6807\u7B7E" placeholder="\u65B0\u5EFA\u6807\u7B7E" autocomplete="off" value="${esc(d.ui.tagNewName || "")}"><svg viewBox="0 0 128 30" aria-hidden="true">${ink([[0, 28], [64, 27.7], [128, 28]], 0.95, TICK)}</svg></span></form>${d.ui.tagError ? `<p class="tag-inline-error" role="status">${esc(d.ui.tagError)}</p>` : ""}${d.ui.ideaDate ? `<button type="button" class="idea-date-filter" data-idea-all aria-label="\u6E05\u9664\u65E5\u671F\u7B5B\u9009 ${d.ui.ideaDate}"><time>${d.ui.ideaDate}</time><span aria-hidden="true">\xD7</span></button>` : ""}`;
     $5("#idea-filters").insertAdjacentHTML("beforeend", `<div class="idea-stage-filters" aria-label="想法状态统计">${["seed", "growing", "ready", "adopted", "parked"].map((stage, n) => `<button type="button" data-idea-stage-filter="${stage}" aria-pressed="${d.ui.ideaStageFilter === stage}">${ideaStar({stage})}<span>${["萌芽", "发展中", "成形", "已采用", "搁置"][n]}</span><small class="mono">${d.ideas.filter(i => (i.stage || "seed") === stage).length}</small></button>`).join("")}</div>`);
+    if (sortedTags.length > 10) $5("#idea-tag-list").insertAdjacentHTML("afterend", `<button type="button" data-expand-idea-tags class="idea-tags-expand">${d.ui.ideaTagsExpanded ? "收起标签" : "展开其余 " + (sortedTags.length - 10) + " 个标签"}</button>`);
     fitTagSidebar();
     $5("#idea-tag-list").scrollTop = d.cache.tagSidebarScroll || 0;
   }
@@ -2700,10 +2708,26 @@ function createThought({ core, r12Art, r14Marine, view }) {
     const naturalHeight = rows.reduce((height, row) => height + row.getBoundingClientRect().height, 0) + Math.max(0, rows.length - 1) * rowGap;
     // 高度就是这些标签自己排起来的高度：全部标签都显示，「新建标签」紧跟在列表后面；只有标签特别多（超过半个屏幕高）才限制高度并在里面滚动
     const tagHeight = Math.round(Math.min(naturalHeight || 28, Math.max(160, innerHeight * 0.5)));
-    list2.style.height = tagHeight + "px";
-    list2.style.maxHeight = tagHeight + "px";
+    list2.style.height = "auto";
+    list2.style.maxHeight = "none";
+    const stream = $5(".ideas-stream"), index = $5(".ideas-index"), feed = $5("#idea-list"), form = $5("#idea-form");
+    if (stream && index && feed && form && getComputedStyle($5(".ideas-layout")).gridTemplateColumns.split(" ").length > 1) {
+      const height = Math.max(index.offsetHeight, form.offsetHeight + 280);
+      stream.style.height = height + "px";
+    }
+
   }
   function renderComposerTags() {
+    d.ui.ideaFilterTags ??= [];
+    $5("#composer-mark").innerHTML = icon("star",19);
+    $5("#composer-mark").setAttribute("aria-label","清空筛选条件");
+    $5("#composer-mark").title = "清空筛选条件";
+    $5("#composer-tags").innerHTML = d.ui.ideaFilterTags.map(tag => `<button type="button" data-idea-tag-filter="${esc(tag)}" aria-label="移除筛选：${esc(tag)}">${esc(tag)} ×</button>`).join("");
+    $5("#idea-tag-drawer").hidden = true;
+    $5("#idea-tag-toggle").hidden = true;
+    $5("#chosen-tag-wrap").inert = false;
+    $5("#chosen-tag-wrap").hidden = false;
+    return;
     d.ui.draftTags ??= [];
     const counts = new Map();
     for (const idea of d.ideas) for (const tag of tagsOf(idea)) counts.set(tag, (counts.get(tag) || 0) + 1);
@@ -2760,7 +2784,11 @@ function createThought({ core, r12Art, r14Marine, view }) {
     d.ideas.unshift({ id, title: firstLine.slice(0, 48), body: bodyLines.join("\n").trim(), stage: "seed", review: false, tag: tags[0] || "", tags: [...tags], created: d.clock.date, createdAt: Date.now() });
     d.ui.idea = id;
     update();
-    announce(clean3);
+    const created = d.ideas.find(i => i.id === id);
+    Promise.resolve(view.lower.settle()).then(() => {
+      if (created && view.plugin.writer.exists(created.id)) view.plugin.writer.open(created.id);
+      else announce("想法已创建，请从列表打开");
+    }).catch(error => announce("保存失败：" + error.message));
   }
   const update = () => {
     renderThought();
@@ -2883,6 +2911,14 @@ function createThought({ core, r12Art, r14Marine, view }) {
         update();}
       return;
     }
+    if (b3.id === "composer-mark") {
+      e.preventDefault(); e.stopImmediatePropagation();
+      d.ui.ideaFilterTags = []; d.ui.ideaTag = null; d.ui.ideaDate = null; d.ui.ideaStageFilter = null;
+      renderIdeas(); return;
+    }
+    if (b3.hasAttribute("data-expand-idea-tags")) {
+      e.preventDefault(); e.stopImmediatePropagation(); d.ui.ideaTagsExpanded = !d.ui.ideaTagsExpanded; renderIdeas(); return;
+    }
     if (b3.id === "idea-tag-toggle") {
       e.preventDefault();
       e.stopPropagation();
@@ -2946,7 +2982,9 @@ function createThought({ core, r12Art, r14Marine, view }) {
       const tag = b3.hasAttribute("data-idea-all") ? null : b3.dataset.ideaTagFilter;
       if (b3.hasAttribute("data-idea-all")) d.ui.ideaStageFilter = null;
       d.ui.ideaDate = null;
-      d.ui.ideaTag = tag;
+      d.ui.ideaTag = null;
+      const selected = d.ui.ideaFilterTags || [];
+      d.ui.ideaFilterTags = tag == null ? [] : selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag];
       d.ui.ideaExpanded = true;
       renderIdeas();
       return;
@@ -3094,7 +3132,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
         $5("#idea-input").focus();
         return;
       }
-      const tags = [...d.ui.draftTags];
+      const tags = [...(d.ui.ideaFilterTags || [])];
       let body = text;
       const typed = [...text.matchAll(/(?:^|\s)#([^\s#@]+)/g)].map((m2) => cleanTag(m2[1])).filter(Boolean);
       if (typed.length) {
@@ -3106,8 +3144,7 @@ function createThought({ core, r12Art, r14Marine, view }) {
       }
       d.ui.draftTags = [];
       closeTagPanels();
-      const content=$5("#idea-content-input").value.trim();
-      captureIdea([body,content].filter(Boolean).join("\n"), tags);
+      captureIdea(body.replace(/\n+/g," "), tags);
       $5("#idea-input").value = "";
       $5("#idea-input").focus();
       d.cache.ideaDraft = "";

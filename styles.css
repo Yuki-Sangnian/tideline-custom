@@ -4291,3 +4291,16 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root .idea-settled-fold button:hover{color:var(--ink)}
 .compass-root .idea-settled-fold .idea-settled-mark{width:16px;text-align:center}
 .compass-root .idea-settled-fold small{font-size:12px}
+
+/* Idea capture is title-only; the lower strip shows only active tag filters. */
+.compass-root #idea-form #idea-content-input{display:none!important}
+.compass-root #idea-form #tag-inline-options,.compass-root #idea-form #idea-tag-toggle{display:none!important}
+.compass-root #idea-form #composer-tags{display:flex!important;visibility:visible!important;gap:12px}
+.compass-root #idea-form #chosen-tag-wrap{display:flex!important;visibility:visible!important}
+.compass-root #idea-form #composer-mark{cursor:pointer}
+
+.compass-root #thought #ideas .ideas-layout{align-items:stretch;min-height:0}
+.compass-root #thought #ideas .ideas-stream{display:flex;flex-direction:column;min-height:0}
+.compass-root #thought #ideas .idea-feed,.compass-root #thought #ideas .idea-feed.is-empty{flex:1 1 0;height:0;min-height:0;max-height:none}
+.compass-root #thought .idea-tags-expand{padding:6px 0;text-align:left;font-size:12px;color:var(--secondary);background:none;border:0;box-shadow:none;cursor:pointer}
+@container compass (max-width:900px){.compass-root #thought #ideas .ideas-stream{height:auto!important}.compass-root #thought #ideas .idea-feed{flex:auto;height:500px}}
