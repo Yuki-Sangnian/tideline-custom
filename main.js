@@ -2563,7 +2563,31 @@ function createThought({ core, r12Art, r14Marine, view }) {
         const link = e.target.closest("a.internal-link");
         if (!link) return;
         e.preventDefault(); e.stopImmediatePropagation();
-        view.app.workspace.openLinkText(link.dataset.href || link.getAttribute("href"), idea.id, e.metaKey || e.ctrlKey);
+        const href = link.dataset.href || link.getAttribute("href"), newTab = e.metaKey || e.ctrlKey;
+        (async () => {
+          // 双链指向的笔记还不存在：建在「想法」文件夹里，继承这条想法的标签，这样它也会出现在想法列表里
+          try {
+            const linkpath = String(href || "").split("|")[0].split("#")[0].trim();
+            if (linkpath && !view.app.metadataCache.getFirstLinkpathDest(linkpath, idea.id)) {
+              const name = linkpath.split("/").pop().replace(/\.md$/, "").replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+              const path = `${FOLDERS.ideas}/${name}.md`;
+              if (name && !view.app.vault.getAbstractFileByPath(path)) {
+                const tags = tagsOf(idea);
+                await view.plugin.writer.create(path, "---\n---\n");
+                await view.plugin.writer.frontmatter(path, (fm) => {
+                  fm.stage = "seed";
+                  fm.created = d.clock.date;
+                  fm.createdAt = Date.now();
+                  if (tags.length) fm.tags = [...tags];
+                });
+                view.frame?.feedback("\u5DF2\u5728\u60F3\u6CD5\u91CC\u65B0\u5EFA\uFF1A" + name);
+                view.app.workspace.openLinkText(path, idea.id, newTab);
+                return;
+              }
+            }
+          } catch (error) { console.error("Tideline idea wikilink create", error); }
+          view.app.workspace.openLinkText(href, idea.id, newTab);
+        })();
       }, { capture: true });
       import_obsidian7.MarkdownRenderer.render(view.app, markdown, target, idea.id.includes("/") ? idea.id : "", component).then(() => {
         if (target.isConnected && component === ideaReadingComponent) { view.more?.update(); view.frames(); }
