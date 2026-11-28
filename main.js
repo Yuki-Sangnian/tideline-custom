@@ -1930,7 +1930,7 @@ function createGoals({ core, view, render }) {
     return `<div class="goal-paper hand-popup" id="goal-paper" tabindex="-1" role="dialog" aria-label="\u76EE\u6807\uFF1A${esc(g2.title)}">
       <button type="button" class="inline-close" data-goal-act="close" aria-label="\u5173\u4E0A\u76EE\u6807\u8BE6\u60C5">\xD7</button>
       <form class="goal-title-form" data-goal-form="title"><input name="title" class="goal-title" value="${esc(g2.title)}" aria-label="\u76EE\u6807\u540D\u79F0" autocomplete="off" spellcheck="false">${underline}</form>
-      <div class="goal-field"><span class="goal-label">\u6BCF\u5468\u8BA1\u5212</span><span class="goal-stepper"><button type="button" data-goal-act="minus" aria-label="\u5C11 0.5 \u5C0F\u65F6" ${g2.planned > 0 ? "" : "disabled"}>\u2212</button><b class="mono" aria-live="polite">${hours(g2.planned)}</b><button type="button" data-goal-act="plus" aria-label="\u591A 0.5 \u5C0F\u65F6">+</button></span></div>
+      <div class="goal-field"><span class="goal-label">\u6BCF\u5468\u8BA1\u5212</span><span class="goal-stepper"><button type="button" data-goal-act="minus" aria-label="\u5C11 0.5 \u5C0F\u65F6" ${g2.planned > 0 ? "" : "disabled"}>\u2212</button><span class="goal-planned-wrap"><input class="goal-planned-input mono" data-goal-planned type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${esc(formatEffortHours(g2.planned))}" aria-label="每周计划小时数，可直接输入" title="直接输入小时数，回车确认"><span class="goal-planned-unit mono">h</span></span><button type="button" data-goal-act="plus" aria-label="\u591A 0.5 \u5C0F\u65F6">+</button></span></div>
       <div class="goal-field"><span class="goal-label">\u622A\u6B62</span><button type="button" class="goal-date ${overdue(g2) ? "overdue" : ""}" data-goal-act="cal-due" aria-expanded="${cal === "due"}">${flag}<span>${g2.due ? g2.due + (overdue(g2) ? " \xB7 \u5DF2\u8FC7" : "") : "\u4E0D\u8BBE"}</span></button></div>
       ${cal === "due" ? calendar("due", g2.due) : ""}
       <div class="goal-field"><span class="goal-label">\u72B6\u6001</span><span class="goal-status" role="radiogroup" aria-label="\u76EE\u6807\u72B6\u6001">${STATUS.map(([k2, t]) => `<button type="button" role="radio" aria-checked="${status === k2}" data-goal-status="${k2}">${t}</button>`).join("")}</span></div>
@@ -2232,6 +2232,20 @@ function createGoals({ core, view, render }) {
       } else rerender();
     }
     if (f.dataset.goalForm === "title") f.elements.title.blur();
+  }, true);
+  // 每周计划：除了加减号，也可以直接输入小时数（回车或点别处确认）
+  HOST.addEventListener("change", (e) => {
+    if (!e.target.matches?.("[data-goal-planned]")) return;
+    const g2 = goalOf(d.ui.goal);
+    if (!g2) return;
+    const n = parseFloat(String(e.target.value).replace(/[hH小时\s]/g, "").replace(/，/g, "."));
+    if (!Number.isFinite(n) || n < 0) { e.target.value = formatEffortHours(g2.planned); return; }
+    g2.planned = Math.min(MAX, Math.round(n * 100) / 100);
+    rerender();
+    touch();
+  }, true);
+  HOST.addEventListener("keydown", (e) => {
+    if (e.target.matches?.("[data-goal-planned]") && e.key === "Enter" && !e.isComposing) { e.preventDefault(); e.target.blur(); }
   }, true);
   HOST.addEventListener("change", (e) => {
     if (!e.target.matches?.(".goal-title")) return;
@@ -3244,6 +3258,14 @@ function createThought({ core, r12Art, r14Marine, view }) {
     if (!date2 || !id) return true;
     e.preventDefault();
     e.stopImmediatePropagation();
+    // 先在界面上立刻换一态，再写进日记（不用等索引刷新，否则看起来像没点中）
+    const hi = d.habits.findIndex((h) => h.id === id);
+    if (hi >= 0) {
+      const cell = date2 === d.clock.date ? d.habits[hi] : null, arr = cell ? null : d.review?.days?.find((r) => r.date === date2)?.habits;
+      const cur = cell ? cell.value : arr ? arr[hi] : undefined, next = cur == null ? true : cur === true ? false : null;
+      if (cell) cell.value = next; else if (arr) arr[hi] = next;
+      renderThought();
+    }
     view.actions?.cycleHabit(id, date2);
     return true;
   };

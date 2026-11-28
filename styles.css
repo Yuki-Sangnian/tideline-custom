@@ -4304,3 +4304,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 .compass-root #thought #ideas .idea-feed,.compass-root #thought #ideas .idea-feed.is-empty{flex:1 1 0;height:0;min-height:0;max-height:none}
 .compass-root #thought .idea-tags-expand{padding:6px 0;text-align:left;font-size:12px;color:var(--secondary);background:none;border:0;box-shadow:none;cursor:pointer}
 @container compass (max-width:900px){.compass-root #thought #ideas .ideas-stream{height:auto!important}.compass-root #thought #ideas .idea-feed{flex:auto;height:500px}}
+
+/* 每周计划：可直接输入小时数 */
+.compass-root .goal-planned-wrap{display:inline-flex;align-items:baseline;gap:2px;min-width:52px;border-bottom:1px solid var(--line)}
+.compass-root .goal-planned-input{width:3.2em;padding:0;border:0;background:transparent;color:inherit;text-align:right;font:inherit;font-weight:500;outline:none;box-shadow:none}
+.compass-root .goal-planned-input:focus{border-bottom-color:var(--ink)}
+.compass-root .goal-planned-wrap:focus-within{border-bottom-color:var(--ink)}
+.compass-root .goal-planned-unit{color:var(--secondary);font-size:.95em}
