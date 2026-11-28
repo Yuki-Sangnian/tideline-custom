@@ -3271,6 +3271,20 @@ function createThought({ core, r12Art, r14Marine, view }) {
   };
   HOST.addEventListener("click", cycleDayHabit, true);
   HOST.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") cycleDayHabit(e); }, true);
+  // 每天里任务前面的小圆圈：点一下完成 / 再点重新打开（和「任务」页共用同一套完成逻辑）
+  HOST.addEventListener("click", async (e) => {
+    const mark = e.target.closest?.("#thought .plan-task .pt-mark[data-complete]");
+    if (!mark) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const t = d.tasks.find((x2) => x2.id === mark.dataset.complete);
+    if (!t) return;
+    const wasDone = t.status === "done";
+    const undo = await view.toggleTask?.(t.id);
+    if (!undo) return;
+    view.frame?.feedback(t.title, undo, wasDone ? "circle" : "check");
+    renderThought();
+  }, true);
   const dropColumn = (target) => target?.closest?.("#thought .day-column[data-drop]");
   function indicateDrop(col) {
     const last = $5("#thought .drop-target");
